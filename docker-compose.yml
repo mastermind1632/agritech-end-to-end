@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: agritech-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-agritech}
+    ports:
+      # bound to localhost only, so the database is not exposed to your network
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # PostgreSQL 18+ images keep data in a versioned sub-folder, so the volume
+      # must be mounted at /var/lib/postgresql (NOT /var/lib/postgresql/data).
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-agritech}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  spring-app:
+    build: .
+    container_name: agritech-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_CORS_ALLOWED_ORIGINS: http://localhost:3000
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agritech}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      APP_JWT_SECRET: ${APP_JWT_SECRET:-change-this-to-a-long-random-production-secret-at-least-32-chars}
+      SPRING_JPA_DDL_AUTO: update
+
+  frontend:
+    build: ./frontend
+    container_name: agritech-web
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - spring-app
+
+volumes:
+  postgres_data:

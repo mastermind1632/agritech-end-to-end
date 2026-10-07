@@ -1,0 +1,1 @@
+export default function Icon({name}){const icons={grid:'⌂',wallet:'▣',market:'▤',users:'♧',spark:'✦',bell:'◔',user:'●',plus:'＋',arrow:'→',leaf:'❧',logout:'↪',chat:'✉'};return <span className="icon">{icons[name]||'•'}</span>}

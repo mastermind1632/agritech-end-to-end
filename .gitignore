@@ -1,0 +1,22 @@
+# secrets / logs
+.env
+*.log
+
+# build output
+target/
+frontend/node_modules/
+frontend/dist/
+
+# IDE files
+bin/
+.settings/
+.classpath
+.project
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+uploads/
+
+*.bak
