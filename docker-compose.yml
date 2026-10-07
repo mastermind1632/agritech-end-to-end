@@ -9,7 +9,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-agritech}
     ports:
       # bound to localhost only, so the database is not exposed to your network
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       # PostgreSQL 18+ images keep data in a versioned sub-folder, so the volume
       # must be mounted at /var/lib/postgresql (NOT /var/lib/postgresql/data).
@@ -25,12 +25,12 @@ services:
     container_name: agritech-api
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "${API_PORT:-8080}:8080"
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      APP_CORS_ALLOWED_ORIGINS: http://localhost:3000
+      APP_CORS_ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT:-3000}
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agritech}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -42,7 +42,7 @@ services:
     container_name: agritech-web
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "${FRONTEND_PORT:-3000}:80"
     depends_on:
       - spring-app
 

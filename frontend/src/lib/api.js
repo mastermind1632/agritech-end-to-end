@@ -75,6 +75,13 @@ export const recommendationApi = {
   generate: (id) => api('/recommendations/generate', { method: 'POST', body: JSON.stringify({ farmerId: id }) })
 };
 
+export const assistantApi = {
+  chat: (prompt) => api('/ai/chat', { method: 'POST', body: JSON.stringify({ prompt }) }),
+  buyingGroup: () => api('/ai/farmer-clusters'),
+  similar: (id) => api(`/ai/farmers/${encodeURIComponent(id)}/nearest`),
+  alerts: (id) => api(`/ai/farmers/${encodeURIComponent(id)}/anomalies`)
+};
+
 Object.assign(marketApi, {
   createSupplier: (body) => api('/suppliers', { method: 'POST', body: JSON.stringify(body) }),
   updateSupplier: (id, body) => api(`/suppliers/${id}`, { method: 'PUT', body: JSON.stringify(body) }),

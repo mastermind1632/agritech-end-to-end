@@ -9,6 +9,7 @@ A portfolio-grade full-stack agricultural finance and group-buying platform buil
 - Supplier marketplace with product catalogue and local supplier information.
 - Group purchasing: create a bulk order, join it, track progress and trigger supplier notifications.
 - Decision intelligence: rule-based recommendations derived from farmer activity and open group orders.
+- Grounded Qwen farming advice through Python LangChain, plus farmer buying comparisons and spending alerts.
 - Supplier workspace for catalogue visibility and group-order notifications.
 - Responsive command-center UI suitable for a portfolio demonstration.
 - PostgreSQL persistence with Docker Compose.
@@ -52,7 +53,65 @@ Open:
 
 The frontend container reverse-proxies `/api` to the Spring Boot service, so the browser does not need to know the internal Docker hostname.
 
-## Run locally without Docker (IDE / terminal)
+## Optional Qwen AI Services
+
+This branch copies the AI implementation from `kgodisoLeonard/AgritechSystemApp`
+without changing that project. The two apps keep separate databases, sessions,
+and deployments. No farmer data or secrets were migrated.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.ai.yml up -d --build
+```
+
+Open the existing **AI buying insights** navigation item. It now includes farming
+questions, source titles, buying comparisons, spending alerts, and the original
+rule-based recommendations. The model defaults to `qwen2.5:0.5b`; the first run
+downloads it. Set `AI_MODEL` to use another installed Ollama model. LangChain
+and Ollama are internal Docker services, not public browser endpoints.
+
+To run alongside the original project's Node API on port 3000, set
+`FRONTEND_PORT=3001` in this repository's `.env` and open `http://localhost:3001`.
+`API_PORT` and `POSTGRES_PORT` can also be changed if those ports are occupied.
+This does not change ports, containers, or database volumes in the original app.
+
+For an IDE backend, run Ollama on port 11434 and the Python adapter on port 8001
+(see `langchain-service/README.md`). Spring reads `OLLAMA_BASE_URL`,
+`AI_LANGCHAIN_URL`, and `AI_MODEL`. Existing finance and farmer chat continue
+working without the optional AI stack; grounded AI questions report an upstream
+error if the model service is unavailable. Farmer-to-farmer `/api/chat` is unchanged.
+
+JWT-authenticated AI endpoints:
+
+- `POST /api/ai/chat`: `{ "prompt": "What should I check before buying seed?" }`.
+  Returns `{model, response, sources}`. Ledger totals come from the authenticated
+  farmer's database records, not client-supplied context or a submitted farmer ID.
+- `GET /api/ai/farmer-clusters`: the number of other farmers in your buying group.
+  It does not return other farmers' names, IDs, financial records, or centroids.
+- `GET /api/ai/farmers/{yourId}/nearest`: anonymous similarities and comparison reasons.
+- `GET /api/ai/farmers/{yourId}/anomalies`: your own spending comparisons. Requests
+  for another farmer's analytics are forbidden.
+
+Grounding uses PostgreSQL full-text retrieval over curated farming guides,
+supplier products and open group orders. This is retrieval, not model training.
+Questions with no matching source are redirected to farming topics without a
+model call. Replies can still be wrong; source retrieval is not a guarantee.
+There are no autonomous tools, persistent conversation memory, or enabled
+LangSmith tracing. The analytics engine is the existing deterministic clustering,
+nearest-profile comparison and population-based anomaly implementation.
+
+Production can combine `docker-compose.prod.yml` with `docker-compose.ai.yml`;
+configure the existing production API/web image names and secrets first. The
+LangChain image is published alongside those images after merging to `main`.
+Serve the frontend and `/api` behind stable HTTPS. This migration does not set
+up public hosting, copy the old temporary tunnel, or redirect the old deployment.
+
+Tests: `./mvnw test`, `npm ci && npm run build` in `frontend`, and
+`python -m unittest discover -s tests -v` in `langchain-service` after installing
+its requirements. Java tests cover grounding, analytics and ownership checks;
+Python tests exercise the real LangChain agent with a fake model. These run in
+CI on this branch and pull requests; production images publish only from `main`.
+
+## Local IDE Setup
 
 Requirements: **Java 21**, **Node 18+**, and a running **PostgreSQL**.
 
