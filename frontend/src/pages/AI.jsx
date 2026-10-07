@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { assistantApi, recommendationApi } from '../lib/api';
 import { hasRecordedActivity, summarizeMatches, spendingAlert } from '../lib/farmerInsights';
 import '../ai.css';
+import BuyingOpportunity from '../components/BuyingOpportunity';
 
-export default function AI({ farmer, setPage }) {
+export default function AI({ farmer, setPage, reviewOrder }) {
   const [items, setItems] = useState([]);
   const [messages, setMessages] = useState([]);
   const [question, setQuestion] = useState('');
@@ -65,7 +66,12 @@ export default function AI({ farmer, setPage }) {
         {messages.length === 0 && <p className="muted">What would you like to ask about seeds, farm costs or group buying?</p>}
         {messages.map((message, index) => <article className={`farm-message ${message.role}`} key={index}>
           <strong>{message.role === 'user' ? 'You' : 'Farm assistant'}</strong><p>{message.text}</p>
-          {!!message.sources?.length && <small>Sources: {message.sources.map(source => source.title).join(', ')}</small>}
+          {!!message.sources?.length && <ul className="farm-sources">{message.sources.map(source => <li key={source.id}>
+            {source.url?.startsWith('https://') ? <a href={source.url} target="_blank" rel="noreferrer">{source.title}</a> : source.title}
+            {source.region && <small>{source.region}</small>}
+            {source.checkedOn && <small>Source checked: {source.checkedOn}</small>}
+            {source.reviewStatus && <small>{source.reviewStatus}</small>}
+          </li>)}</ul>}
         </article>)}
         {sending && <p role="status">Thinking...</p>}
       </div>
@@ -98,7 +104,9 @@ export default function AI({ farmer, setPage }) {
     </section>
     <section className="farm-insights">
       <div className="farm-section-head"><h2>Group-buying opportunities</h2><button className="primary" onClick={generate} disabled={refreshing}>{refreshing ? 'Checking...' : 'Find opportunities'}</button></div>
-      {items.length ? <ul className="farm-comparisons">{items.map((item, index) => <li key={item.id || index}><p>{item.reason}</p><button className="text-button" onClick={() => setPage('groups')}>View group orders</button></li>)}</ul> : <p className="muted">No buying opportunities saved yet.</p>}
+      {items.length ? <div className="buying-opportunities">{items.map(item =>
+        <BuyingOpportunity key={item.id} item={item} reviewOrder={reviewOrder} />)}</div>
+        : <p className="muted">No open orders match your recorded purchases. Add your farm expenses to find relevant opportunities.</p>}
     </section>
   </>;
 }

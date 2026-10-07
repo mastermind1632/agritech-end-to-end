@@ -71,6 +71,7 @@ export const groupApi = {
   join: (id, body) => api(`/group-orders/${id}/join`, { method: 'POST', body: JSON.stringify(body) })
 };
 export const recommendationApi = {
+  quote: (id, quantity) => api(`/recommendations/${encodeURIComponent(id)}/quote?quantity=${encodeURIComponent(quantity)}`),
   list: (id) => api(`/recommendations/farmer/${id}`),
   generate: (id) => api('/recommendations/generate', { method: 'POST', body: JSON.stringify({ farmerId: id }) })
 };

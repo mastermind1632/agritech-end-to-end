@@ -16,11 +16,14 @@ const PAGES = { dashboard: Dashboard, finance: Finance, market: Marketplace, gro
 
 function Shell({ farmer, onLogout }) {
   const [page, setPage] = useState('dashboard');
+  const [initialOrderId, setInitialOrderId] = useState(null);
+  const reviewOrder = id => { setInitialOrderId(id); setPage('groups'); };
   const notices = useFarmerNotices(farmer.id);
   const Page = PAGES[page] || SupplierPortal;
   return (
     <Layout page={page} setPage={setPage} farmer={farmer} onLogout={onLogout} noticeCount={notices.unread}>
-      <Page farmer={farmer} setPage={setPage} notices={notices} />
+      <Page farmer={farmer} setPage={setPage} notices={notices} reviewOrder={reviewOrder}
+        initialOrderId={initialOrderId} onOrderOpened={() => setInitialOrderId(null)} />
     </Layout>
   );
 }

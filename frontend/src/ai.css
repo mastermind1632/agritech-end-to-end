@@ -25,3 +25,21 @@
 @media(max-width:650px){.farm-comparison-totals{grid-template-columns:1fr;gap:16px}.farm-comparison-totals dd{font-size:20px}}
 @media(max-width:1000px){.farm-assistant,.farm-insights{margin:0 25px}.app-shell:has(.farm-assistant) .sidebar .brand>div:last-child,.app-shell:has(.farm-assistant) .sidebar .mini-profile>div:last-child{display:none}.app-shell:has(.farm-assistant) .sidebar .icon{font-size:18px}}
 @media(max-width:650px){.farm-assistant,.farm-insights{margin:0 18px}.farm-message{max-width:100%}.farm-question{flex-wrap:wrap}.farm-input{flex-basis:100%}}
+.buying-opportunities { display: grid; gap: 18px; }
+.buying-opportunity { border: 1px solid #dbe5df; border-radius: 8px; padding: 20px; background: white; }
+.buying-opportunity h3 { margin: 0 0 12px; }
+.buying-quantity { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; }
+.buying-quantity label { display: grid; gap: 6px; }
+.buying-quantity input { width: 120px; height: 42px; padding: 8px 12px; border: 1px solid #b9cec2; border-radius: 4px; font: inherit; }
+.buying-opportunity .text-button { min-height: 40px; font-size: 14px; margin-top: 8px; }
+.buying-prices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.buying-prices dt { color: #52635d; font-size: 14px; }
+.buying-prices dd { margin: 8px 0 0; font-size: 20px; font-weight: 700; }
+.buying-caution { color: #75540a; font-size: 14px; }
+.buying-opportunity small { display: block; color: #52635d; }
+.farm-sources { padding-left: 18px; font-size: 13px; }
+.farm-sources small { display: block; }
+@media (max-width: 600px) { .buying-prices { grid-template-columns: 1fr; } .buying-opportunity { padding: 16px; } }
+.buying-alternatives ul { padding: 0; list-style: none; }
+.buying-alternatives li { display: flex; gap: 12px; justify-content: space-between; flex-wrap: wrap; padding: 12px 0; border-bottom: 1px solid #dbe5df; }
+.buying-alternatives strong { white-space: nowrap; }

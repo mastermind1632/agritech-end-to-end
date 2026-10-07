@@ -1,139 +1,134 @@
 package tut.ac.za.AgriFinanceAPIs.recommendation;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Instant;
+import java.util.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
-
 import tut.ac.za.AgriFinanceAPIs.farmer.*;
 import tut.ac.za.AgriFinanceAPIs.finance.*;
 import tut.ac.za.AgriFinanceAPIs.grouporder.*;
 import tut.ac.za.AgriFinanceAPIs.supplier.*;
 
-import java.util.*;
-import java.util.stream.*;
-
 @Service
 public class RecommendationService {
-
-    private final AiRecommendationRepository recs;
+    public record PriceComparison(String currency, int quantity, BigDecimal listedUnitPrice,
+            BigDecimal listedTotal, BigDecimal listedDiscountPercent, BigDecimal indicativeGroupTotal,
+            BigDecimal indicativeDifference, boolean supplierDiscountConfirmed,
+            boolean deliveryKnown, boolean finalTotalKnown, Instant checkedAt) {}
+    public record EquivalentPrice(String productId, String productName, BigDecimal packSize,
+            String packUnit, BigDecimal listedPrice, BigDecimal pricePerUnit) {}
+    public record Opportunity(String id, String recommendedProductId, String suggestedGroupOrderId,
+            String productName, String reason, List<String> matchedItems, int remainingQuantity,
+            PriceComparison quote, List<EquivalentPrice> equivalentPrices) {}
     private final FarmerRepository farmers;
     private final ExpenseRepository expenses;
     private final SupplierProductRepository products;
     private final GroupOrderRepository orders;
     private final GroupOrderItemRepository items;
 
-    public RecommendationService(
-            AiRecommendationRepository r,
-            FarmerRepository f,
-            ExpenseRepository e,
-            SupplierProductRepository p,
-            GroupOrderRepository o,
-            GroupOrderItemRepository i) {
-
-        recs = r;
-        farmers = f;
-        expenses = e;
-        products = p;
-        orders = o;
-        items = i;
+    public RecommendationService(AiRecommendationRepository unused, FarmerRepository farmers,
+            ExpenseRepository expenses, SupplierProductRepository products,
+            GroupOrderRepository orders, GroupOrderItemRepository items) {
+        this.farmers = farmers; this.expenses = expenses; this.products = products;
+        this.orders = orders; this.items = items;
     }
 
-    public List<AiRecommendation> forFarmer(String farmerId) {
+    public List<Opportunity> forFarmer(String farmerId) { return generate(farmerId); }
 
-        ensureFarmer(farmerId);
-
-        return recs.findAllByFarmerIdOrderByCreatedAtDesc(farmerId);
-    }
-
-    public List<AiRecommendation> generate(String farmerId) {
-
-        Farmer farmer = ensureFarmer(farmerId);
-
-        List<SupplierProduct> ps = products.findAll();
-
-        List<GroupOrder> open =
-                orders.findAllByStatusOrderByCreatedAtDesc("open");
-
-        String expenseText = expenses
-                .findAllByFarmerIdOrderByDateDesc(farmerId)
-                .stream()
-                .map(Expense::getItem)
-                .filter(Objects::nonNull)
-                .collect(Collectors.joining(" "))
-                .toLowerCase();
-
-        List<AiRecommendation> result = new ArrayList<>();
-
-        for (GroupOrder o : open) {
-
-            SupplierProduct p =
-                    products.findById(o.getProductId()).orElse(null);
-
-            if (p == null) {
-                continue;
-            }
-
-            boolean activity =
-                    expenseText.contains(
-                            p.getProductName().toLowerCase()
-                    );
-
-            long sameGroupFarmers =
-                    items.findAllByGroupOrderIdOrderByJoinedAtAsc(o.getId())
-                            .stream()
-                            .filter(i -> !farmerId.equals(i.getFarmerId()))
-                            .count();
-
-            if (activity || sameGroupFarmers > 0) {
-
-                AiRecommendation r = new AiRecommendation();
-
-                r.setFarmerId(farmerId);
-                r.setRecommendedProductId(p.getId());
-                r.setSuggestedGroupOrderId(o.getId());
-
-                String reason;
-
-                if (activity) {
-                    reason = "Your recorded expenses suggest you use "
-                            + p.getProductName() + ". ";
-                } else {
-                    reason = "Other farmers are already joining a group order for "
-                            + p.getProductName() + ". ";
-                }
-
-                if (farmer.getLocation() != null
-                        && !farmer.getLocation().isBlank()) {
-
-                    reason += "A group purchase may help you coordinate "
-                            + "a bulk purchase from the supplier.";
-
-                } else {
-
-                    reason += "A group purchase may help coordinate "
-                            + "a bulk purchase from the supplier.";
-                }
-
-                r.setReason(reason);
-
-                result.add(recs.save(r));
-            }
+    public List<Opportunity> generate(String farmerId) {
+        if (!farmers.existsById(farmerId))
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Farmer not found");
+        List<String> history = new ArrayList<>(expenses.findAllByFarmerIdOrderByDateDesc(farmerId)
+                .stream().map(Expense::getItem).filter(Objects::nonNull).toList());
+        // Use only this farmer's purchases, never another farmer's participation as a reason.
+        for (GroupOrderItem item : items.findAllByFarmerId(farmerId)) {
+            orders.findById(item.getGroupOrderId()).flatMap(o -> products.findById(o.getProductId()))
+                    .map(SupplierProduct::getProductName).ifPresent(history::add);
         }
+        List<Opportunity> result = new ArrayList<>();
+        for (GroupOrder order : orders.findAllByStatusOrderByCreatedAtDesc("open")) {
+            if (remaining(order) < 1 || items.existsByGroupOrderIdAndFarmerId(order.getId(), farmerId)) continue;
+            SupplierProduct product = products.findById(order.getProductId()).orElse(null);
+            if (product == null || product.getProductName() == null || !validPrice(product, order)) continue;
+            List<String> matched = history.stream().filter(h -> matches(h, product.getProductName()))
+                    .distinct().limit(5).toList();
+            if (matched.isEmpty()) continue;
+            result.add(new Opportunity(order.getId(), product.getId(), order.getId(), product.getProductName(),
+                    "Matches your recorded purchases: " + String.join(", ", matched)
+                    + ". Check the variety, pack size and supplier terms before joining.",
+                    matched, remaining(order), compare(product, order, 1), equivalents(product)));
+        }
+        return result.stream().sorted(Comparator.comparingInt((Opportunity o) -> o.matchedItems().size())
+                .reversed().thenComparing(Opportunity::id)).limit(10).toList();
+    }
 
+    public Opportunity quote(String farmerId, String orderId, int quantity) {
+        Opportunity own = generate(farmerId).stream().filter(o -> o.id().equals(orderId)).findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Buying opportunity unavailable"));
+        GroupOrder order = orders.findById(orderId).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.CONFLICT, "Order is no longer available"));
+        SupplierProduct product = products.findById(own.recommendedProductId()).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.CONFLICT, "Product is no longer available"));
+        return new Opportunity(own.id(), own.recommendedProductId(), own.suggestedGroupOrderId(),
+                own.productName(), own.reason(), own.matchedItems(), remaining(order), compare(product, order, quantity),
+                equivalents(product));
+    }
+
+    private List<EquivalentPrice> equivalents(SupplierProduct selected) {
+        if (!hasSpecification(selected)) return List.of();
+        // A shared exact specification code and unit are required. Names alone do not prove equivalence.
+        return products.findAll().stream().filter(p -> hasSpecification(p)
+                && p.getComparisonKey().equalsIgnoreCase(selected.getComparisonKey())
+                && p.getPackUnit().equals(selected.getPackUnit()) && p.getPrice()!=null && p.getPrice().signum()>=0)
+                .map(p -> new EquivalentPrice(p.getId(),p.getProductName(),p.getPackSize(),p.getPackUnit(),p.getPrice(),
+                        p.getPrice().divide(p.getPackSize(),6,RoundingMode.HALF_UP)))
+                .sorted(Comparator.comparing(EquivalentPrice::pricePerUnit).thenComparing(EquivalentPrice::productId))
+                .limit(6).toList();
+    }
+
+    private static boolean hasSpecification(SupplierProduct p) {
+        return p.getComparisonKey()!=null && !p.getComparisonKey().isBlank()
+                && p.getPackSize()!=null && p.getPackSize().signum()>0
+                && Set.of("kg","l","unit").contains(p.getPackUnit()==null?"":p.getPackUnit());
+    }
+
+    static boolean matches(String purchase, String product) {
+        Set<String> a = terms(purchase), b = terms(product);
+        return !a.isEmpty() && !b.isEmpty() && a.stream().anyMatch(b::contains);
+    }
+
+    private static Set<String> terms(String text) {
+        Set<String> generic = Set.of("seed", "seeds", "fertiliser", "fertilizer", "bag", "bags",
+                "kg", "pack", "packs", "the", "for", "and", "purchase", "bought", "buy", "of", "litre", "litres",
+                "planting", "agricultural", "organic", "hybrid", "farm", "farming", "supply", "supplies");
+        Set<String> result = new HashSet<>();
+        for (String token : text.toLowerCase(Locale.ROOT).split("[^a-z]+"))
+            if (token.length() > 2 && !generic.contains(token)) result.add(token);
         return result;
     }
 
-    private Farmer ensureFarmer(String id) {
+    private static int remaining(GroupOrder o) {
+        return o.getTargetQuantity() == null || o.getCurrentQuantity() == null ? 0
+                : Math.max(0, o.getTargetQuantity() - o.getCurrentQuantity());
+    }
 
-        if (id == null || !farmers.existsById(id)) {
+    private static boolean validPrice(SupplierProduct p, GroupOrder o) {
+        return p.getPrice() != null && p.getPrice().signum() >= 0 && o.getDiscountRate() != null
+                && o.getDiscountRate().signum() >= 0 && o.getDiscountRate().compareTo(new BigDecimal("100")) <= 0;
+    }
 
-            throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND,
-                    "Farmer not found"
-            );
-        }
-
-        return farmers.findById(id).get();
+    static PriceComparison compare(SupplierProduct product, GroupOrder order, int quantity) {
+        if (!"open".equals(order.getStatus()) || quantity < 1 || quantity > remaining(order))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Choose a quantity within the remaining open order");
+        if (!validPrice(product, order))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Listed prices are unavailable");
+        BigDecimal listed = product.getPrice().multiply(BigDecimal.valueOf(quantity)).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal group = listed.multiply(BigDecimal.ONE.subtract(order.getDiscountRate().movePointLeft(2)))
+                .setScale(2, RoundingMode.HALF_UP);
+        return new PriceComparison("ZAR", quantity, product.getPrice(), listed, order.getDiscountRate(),
+                group, listed.subtract(group), false, false, false, Instant.now());
     }
 }
-

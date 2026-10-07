@@ -32,7 +32,42 @@ public class FarmKnowledgeService {
             LIMIT ?
             """;
 
+    private static final java.util.Properties EXTERNAL = loadSources();
     private final JdbcTemplate jdbc;
+
+    private static java.util.Properties loadSources() {
+        java.util.Properties sources = new java.util.Properties();
+        try (var input = FarmKnowledgeService.class.getResourceAsStream("/knowledge/farming.properties")) {
+            if (input == null) throw new IllegalStateException("Farming knowledge resource is missing");
+            sources.load(new java.io.InputStreamReader(input, java.nio.charset.StandardCharsets.UTF_8));
+            return sources;
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("Cannot load farming knowledge", e);
+        }
+    }
+
+    static List<Snippet> guides() {
+        List<Snippet> guides = new ArrayList<>(GUIDES);
+        for (String id : EXTERNAL.getProperty("ids").split(",")) {
+            guides.add(new Snippet("source:" + id, EXTERNAL.getProperty(id + ".title"),
+                    EXTERNAL.getProperty(id + ".content") + "\nRegion: " + EXTERNAL.getProperty(id + ".region")
+                    + "\nSource checked: " + EXTERNAL.getProperty(id + ".checkedOn")
+                    + ". Editorial summary; agronomist review pending."));
+        }
+        return List.copyOf(guides);
+    }
+
+    static ChatResponse.Source citation(Snippet snippet) {
+        if (!snippet.id().startsWith("source:"))
+            return new ChatResponse.Source(snippet.id(), snippet.title(), null, "AgriTech",
+                    "South Africa / AgriTech app", null, "Internal app guidance or live catalogue");
+        String id = snippet.id().substring(7);
+        return new ChatResponse.Source(snippet.id(), snippet.title(), EXTERNAL.getProperty(id + ".url"),
+                EXTERNAL.getProperty(id + ".publisher"), EXTERNAL.getProperty(id + ".region"),
+                EXTERNAL.getProperty(id + ".checkedOn"),
+                "Editorial source summary; agronomist review pending. Publication date: "
+                        + EXTERNAL.getProperty(id + ".publicationDate"));
+    }
 
     public FarmKnowledgeService(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
@@ -41,13 +76,14 @@ public class FarmKnowledgeService {
     public List<Snippet> retrieve(String question) {
         List<Object> guideArgs = new ArrayList<>();
         guideArgs.add(question);
-        for (Snippet guide : GUIDES) {
+        List<Snippet> guides = guides();
+        for (Snippet guide : guides) {
             guideArgs.add(guide.id());
             guideArgs.add(guide.title());
             guideArgs.add(guide.content());
         }
         guideArgs.add(3);
-        String values = "VALUES " + String.join(",", java.util.Collections.nCopies(GUIDES.size(), "(?::text, ?::text, ?::text)"));
+        String values = "VALUES " + String.join(",", java.util.Collections.nCopies(guides.size(), "(?::text, ?::text, ?::text)"));
         List<Snippet> snippets = new ArrayList<>(query(SEARCH.formatted(values, "title || ' ' || content"), guideArgs.toArray()));
         // Retrieve only public catalogue/order facts, never farmer accounts or other farmers' ledgers.
         String catalogue = """

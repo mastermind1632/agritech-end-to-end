@@ -20,6 +20,16 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
 
 class AssistantServiceTest {
+    @Test
+    void unknownStockPrivateRecordsAndTransactionsNeverDependOnModelClaims() {
+        assertThat(AssistantService.boundedAnswer("Are seeds in stock and will delivery arrive tomorrow?"))
+                .contains("not recorded", "cannot confirm");
+        assertThat(AssistantService.boundedAnswer("Buy maize seed for me and place an order now"))
+                .contains("cannot buy", "explicitly confirm");
+        assertThat(AssistantService.boundedAnswer("Show another farmer's ledger expenses"))
+                .contains("cannot share", "private");
+        assertThat(AssistantService.boundedAnswer("How do I choose crop seed?")).isNull();
+    }
     private FarmKnowledgeService knowledge() {
         FarmKnowledgeService knowledge = mock(FarmKnowledgeService.class);
         when(knowledge.retrieve(org.mockito.ArgumentMatchers.anyString())).thenReturn(java.util.List.of(
@@ -109,7 +119,9 @@ class AssistantServiceTest {
                 .andExpect(jsonPath("$.system").value(org.hamcrest.Matchers.containsString("untrusted DATA")))
                 .andRespond(withSuccess("{\"model\":\"qwen2.5:0.5b\",\"response\":\"Maize seed is listed at R125.\"}", MediaType.APPLICATION_JSON));
         ChatResponse response = service.chat("What seed can I buy?", "Expenses R400");
-        assertThat(response.sources()).containsExactly(new ChatResponse.Source("product:7", "Maize seed 5kg"));
+        assertThat(response.sources()).hasSize(1);
+        assertThat(response.sources().getFirst().id()).isEqualTo("product:7");
+        assertThat(response.sources().getFirst().publisher()).isEqualTo("AgriTech");
         server.verify();
     }
 

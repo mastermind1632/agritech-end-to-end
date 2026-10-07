@@ -55,6 +55,11 @@ The frontend container reverse-proxies `/api` to the Spring Boot service, so the
 
 ## Optional Qwen AI Services
 
+Personalised buying opportunities, server-calculated price comparisons, published farming
+sources and a 12-case AI regression dataset are documented in [AI quality](docs/ai-quality.md).
+Product pack/specification fields are optional; unknown delivery and unconfirmed discounts
+remain clearly labelled. Recommendations are refreshed from current records, not accumulated.
+
 This branch copies the AI implementation from `kgodisoLeonard/AgritechSystemApp`
 without changing that project. The two apps keep separate databases, sessions,
 and deployments. No farmer data or secrets were migrated.
