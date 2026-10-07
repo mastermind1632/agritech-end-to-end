@@ -72,6 +72,30 @@ class FarmerAnalyticsServiceTest {
                 new FarmerProfile("farmer-4", "Dineo", "Free State", bd("2000.00"), 12, 10, bd("1800.00"), 8, Set.of("tractor", "diesel")));
     }
 
+    @Test
+    void emptyFarmsDoNotBecomeBuyingMatchesOrClusters() {
+        var empty = new FarmerProfile("empty", "Empty", "Limpopo", bd("0"), 0, 0, bd("0"), 0, Set.of());
+        when(gateway.farmerExists("empty")).thenReturn(true);
+        when(gateway.farmerProfiles()).thenReturn(List.of(empty, sampleFarmers().get(0)));
+        assertThat(service.nearestFarmers("empty", 5).matches()).isEmpty();
+        assertThat(service.clusters(3).clusters()).flatExtracting(cluster -> cluster.farmers()).hasSize(1);
+    }
+
+    @Test
+    void rejectsLocationOnlyMatchesAndDoesNotDescribeZeroOrdersAsSharedActivity() {
+        var target = new FarmerProfile("target", "Target", "Limpopo", bd("100"), 1, 0, bd("0"), 1, Set.of("maize"));
+        var unrelated = new FarmerProfile("unrelated", "Unrelated", "Limpopo", bd("5000"), 1, 0, bd("0"), 1, Set.of("tractor"));
+        var empty = new FarmerProfile("empty", "Empty", "Limpopo", bd("0"), 0, 0, bd("0"), 0, Set.of());
+        var shared = new FarmerProfile("shared", "Shared", "Limpopo", bd("105"), 1, 0, bd("0"), 1, Set.of("maize"));
+        when(gateway.farmerExists("target")).thenReturn(true);
+        when(gateway.farmerProfiles()).thenReturn(List.of(target, unrelated, empty, shared));
+        var response = service.nearestFarmers("target", 5);
+        assertThat(response.matches()).hasSize(1);
+        assertThat(response.matches().get(0).farmer().farmerId()).isEqualTo("shared");
+        assertThat(response.matches().get(0).reasons()).contains("similar recorded expense totals")
+                .doesNotContain("similar group-order activity");
+    }
+
     private BigDecimal bd(String value) {
         return new BigDecimal(value);
     }

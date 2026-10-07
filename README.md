@@ -85,7 +85,7 @@ JWT-authenticated AI endpoints:
 - `POST /api/ai/chat`: `{ "prompt": "What should I check before buying seed?" }`.
   Returns `{model, response, sources}`. Ledger totals come from the authenticated
   farmer's database records, not client-supplied context or a submitted farmer ID.
-- `GET /api/ai/farmer-clusters`: the number of other farmers in your buying group.
+- `GET /api/ai/farmer-clusters`: the number of other active farmers with a similar overall spending profile, not membership in an actual group order.
   It does not return other farmers' names, IDs, financial records, or centroids.
 - `GET /api/ai/farmers/{yourId}/nearest`: anonymous similarities and comparison reasons.
 - `GET /api/ai/farmers/{yourId}/anomalies`: your own spending comparisons. Requests
@@ -98,6 +98,14 @@ model call. Replies can still be wrong; source retrieval is not a guarantee.
 There are no autonomous tools, persistent conversation memory, or enabled
 LangSmith tracing. The analytics engine is the existing deterministic clustering,
 nearest-profile comparison and population-based anomaly implementation.
+
+Empty farms are excluded from spending clusters and buying matches. Matching
+requires shared recorded terms, two positive expense totals within 20% of the
+larger total, or two positive group-order counts within one order of each other.
+Location alone and two zero order counts are not matching evidence. The UI
+summarizes shared signals without anonymous numbered farmer rows; a farm may
+appear in more than one signal category. Nearest matches are capped at five in
+the UI and can differ from the overall spending-cluster count.
 
 Production can combine `docker-compose.prod.yml` with `docker-compose.ai.yml`;
 configure the existing production API/web image names and secrets first. The

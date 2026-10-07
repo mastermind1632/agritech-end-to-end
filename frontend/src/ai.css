@@ -15,5 +15,13 @@
 .farm-comparisons{list-style:none;padding:0;margin:0 0 24px}
 .farm-comparisons li{padding:16px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
 .farm-comparisons p{line-height:1.5}
+.farm-comparison-totals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;margin:0 0 20px}
+.farm-comparison-totals dt{font-size:14px;color:var(--muted);line-height:1.5}
+.farm-comparison-totals dd{font-size:22px;font-weight:700;margin:8px 0 0}
+.farm-match-summary{list-style:none;padding:0;margin:0 0 20px;max-width:760px}
+.farm-match-summary li{display:flex;align-items:baseline;justify-content:space-between;gap:20px;padding:12px 0;border-bottom:1px solid var(--line)}
+.farm-match-summary span{min-width:0;overflow-wrap:anywhere;line-height:1.5}
+.farm-match-summary strong{white-space:nowrap;font-size:14px}
+@media(max-width:650px){.farm-comparison-totals{grid-template-columns:1fr;gap:16px}.farm-comparison-totals dd{font-size:20px}}
 @media(max-width:1000px){.farm-assistant,.farm-insights{margin:0 25px}.app-shell:has(.farm-assistant) .sidebar .brand>div:last-child,.app-shell:has(.farm-assistant) .sidebar .mini-profile>div:last-child{display:none}.app-shell:has(.farm-assistant) .sidebar .icon{font-size:18px}}
 @media(max-width:650px){.farm-assistant,.farm-insights{margin:0 18px}.farm-message{max-width:100%}.farm-question{flex-wrap:wrap}.farm-input{flex-basis:100%}}

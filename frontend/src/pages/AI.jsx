@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { assistantApi, recommendationApi } from '../lib/api';
-import { matchReason, spendingAlert } from '../lib/farmerInsights';
+import { hasRecordedActivity, summarizeMatches, spendingAlert } from '../lib/farmerInsights';
 import '../ai.css';
 
 export default function AI({ farmer, setPage }) {
@@ -18,7 +18,7 @@ export default function AI({ farmer, setPage }) {
   const activeFarmer = useRef(farmer.id);
   const load = async () => {
     const current = ++session.current;
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setInsights(null);
     try {
       const [group, similar, alerts, recommendations] = await Promise.all([
         assistantApi.buyingGroup(), assistantApi.similar(farmer.id),
@@ -79,15 +79,21 @@ export default function AI({ farmer, setPage }) {
       <div className="farm-section-head"><h2>Your farm comparisons</h2><button className="secondary" onClick={load} disabled={loading}>{loading ? 'Loading...' : 'Refresh comparisons'}</button></div>
       {error && <p className="farm-error" role="alert">{error}</p>}
       {!loading && insights && <>
-        <h3>Farmers with similar buying activity</h3><p>{insights.group.otherFarmers} other farmers in your buying group.</p>
-        {insights.similar.length ? <ul className="farm-comparisons">{insights.similar.map((match, index) => <li key={index}>
-          <strong>Similar farm {index + 1}</strong><p>{match.reasons.map(matchReason).join('. ')}</p>
-        </li>)}</ul> : <p className="muted">No other farms to compare yet.</p>}
-        <h3>Spending to review</h3>
+        {hasRecordedActivity(insights.alerts.farmer) ? <>
+          <dl className="farm-comparison-totals">
+            <div><dt>Similar overall spending patterns</dt><dd>{insights.group.otherFarmers} other {insights.group.otherFarmers === 1 ? 'farm' : 'farms'}</dd></div>
+            <div><dt>Buying activity in common</dt><dd>{insights.similar.length} {insights.similar.length === 1 ? 'match' : 'matches'}</dd></div>
+          </dl>
+          {insights.similar.length ? <ul className="farm-match-summary">{summarizeMatches(insights.similar).map(summary => <li key={summary.label}>
+            <span>{summary.label}</span><strong>{summary.count} {summary.count === 1 ? 'farm' : 'farms'}</strong>
+          </li>)}</ul> : <p className="muted">No farms with shared buying activity found yet.</p>}
+          <button className="secondary" onClick={() => setPage('groups')}>Browse open group orders</button>
+        </> : <p className="muted">No expense or group-order records available for a comparison.</p>}
+        {hasRecordedActivity(insights.alerts.farmer) && <><h3>Spending to review</h3>
         {insights.alerts.anomalies.length ? <ul className="farm-comparisons">{insights.alerts.anomalies.map((alert, index) => {
           const copy = spendingAlert(alert);
           return <li key={index}><strong>{copy.title}</strong><p>{copy.comparison}</p><p>{copy.action}</p></li>;
-        })}</ul> : <p className="muted">No unusual spending flagged in your current records.</p>}
+        })}</ul> : <p className="muted">No unusual spending flagged in your current records.</p>}</>}
       </>}
     </section>
     <section className="farm-insights">

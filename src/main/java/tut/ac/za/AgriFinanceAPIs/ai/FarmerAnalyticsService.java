@@ -29,7 +29,7 @@ public class FarmerAnalyticsService {
     }
 
     public ClusterResponse clusters(int requestedK) {
-        List<FarmerProfile> farmers = gateway.farmerProfiles();
+        List<FarmerProfile> farmers = gateway.farmerProfiles().stream().filter(FarmerAnalyticsService::hasActivity).toList();
         if (farmers.isEmpty()) {
             return new ClusterResponse(requestedK, 0, List.of());
         }
@@ -69,6 +69,10 @@ public class FarmerAnalyticsService {
                 .findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Farmer not found"));
 
+        if (!hasActivity(target)) {
+            return new FarmerMatchResponse(snapshot(target), List.of());
+        }
+        farmers = farmers.stream().filter(FarmerAnalyticsService::hasActivity).toList();
         FeatureSpace featureSpace = FeatureSpace.from(farmers);
         int targetIndex = farmers.indexOf(target);
         List<FarmerMatch> matches = new ArrayList<>();
@@ -79,6 +83,10 @@ public class FarmerAnalyticsService {
             }
             double vectorSimilarity = 1.0 / (1.0 + distance(featureSpace.normalized.get(targetIndex), featureSpace.normalized.get(i)));
             double tokenSimilarity = jaccard(target.tokens(), candidate.tokens());
+            // Location alone and matching zero counts are not buying evidence.
+            if (tokenSimilarity == 0 && !similarExpenses(target, candidate) && !similarOrders(target, candidate)) {
+                continue;
+            }
             double locationBoost = sameLocation(target, candidate) ? 0.08 : 0;
             double similarity = Math.min(1.0, (vectorSimilarity * 0.7) + (tokenSimilarity * 0.22) + locationBoost);
             matches.add(new FarmerMatch(snapshot(candidate), round(similarity), matchReasons(target, candidate, tokenSimilarity)));
@@ -196,15 +204,34 @@ public class FarmerAnalyticsService {
         if (tokenSimilarity > 0) {
             Set<String> shared = new HashSet<>(target.tokens());
             shared.retainAll(candidate.tokens());
-            reasons.add("shared products or expense terms: " + String.join(", ", shared.stream().limit(3).toList()));
+            reasons.add("shared products or expense terms: " + String.join(", ", shared.stream().sorted().limit(3).toList()));
         }
-        if (Math.abs(target.orderCount() - candidate.orderCount()) <= 1) {
+        if (similarExpenses(target, candidate)) {
+            reasons.add("similar recorded expense totals");
+        }
+        if (similarOrders(target, candidate)) {
             reasons.add("similar group-order activity");
         }
         if (reasons.isEmpty()) {
             reasons.add("similar spending and activity pattern");
         }
         return reasons;
+    }
+
+    private static boolean hasActivity(FarmerProfile farmer) {
+        return farmer.expenseCount() > 0 || farmer.orderCount() > 0;
+    }
+
+    private static boolean similarOrders(FarmerProfile first, FarmerProfile second) {
+        return first.orderCount() > 0 && second.orderCount() > 0
+                && Math.abs(first.orderCount() - second.orderCount()) <= 1;
+    }
+
+    private static boolean similarExpenses(FarmerProfile first, FarmerProfile second) {
+        BigDecimal smaller = first.totalExpense().min(second.totalExpense());
+        BigDecimal larger = first.totalExpense().max(second.totalExpense());
+        // Require two positive totals within 20% of the larger recorded total.
+        return smaller.signum() > 0 && smaller.compareTo(larger.multiply(new BigDecimal("0.8"))) >= 0;
     }
 
     private static boolean sameLocation(FarmerProfile first, FarmerProfile second) {

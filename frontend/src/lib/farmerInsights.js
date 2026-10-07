@@ -14,11 +14,22 @@ export function hasRecordedActivity(farmer) {
 export function matchReason(reason) {
   if (reason === 'same location') return 'Same recorded area';
   if (reason === 'similar group-order activity') return 'Similar group-buying activity';
+  if (reason === 'similar recorded expense totals') return 'Similar recorded expense totals';
   if (reason === 'similar spending and activity pattern') return 'Similar recorded spending and buying activity';
   if (reason.startsWith('shared products or expense terms: ')) {
     return reason.replace('shared products or expense terms: ', 'Recorded items in common: ');
   }
   return 'Similar recorded activity';
+}
+
+export function summarizeMatches(matches = []) {
+  const summaries = new Map();
+  for (const match of matches) {
+    for (const label of new Set((match.reasons || []).map(matchReason))) {
+      summaries.set(label, (summaries.get(label) || 0) + 1);
+    }
+  }
+  return [...summaries].map(([label, count]) => ({ label, count }));
 }
 
 const money = (value) => new Intl.NumberFormat('en-ZA', {
