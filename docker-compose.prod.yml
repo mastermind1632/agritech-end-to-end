@@ -4,7 +4,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-default_postgres_password}
       POSTGRES_DB: agritech
     volumes:
       - postgres_data:/var/lib/postgresql
@@ -23,8 +23,8 @@ services:
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/agritech
       SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
-      APP_JWT_SECRET: ${APP_JWT_SECRET:?set APP_JWT_SECRET in .env}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-default_postgres_password}
+      APP_JWT_SECRET: ${APP_JWT_SECRET:-default_temp_jwt_secret}
 
   frontend:
     image: ghcr.io/yourusername/agritech-web:latest
