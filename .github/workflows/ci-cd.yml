@@ -65,13 +65,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Copy production files to OCI Server
+      - name: Generate .env file locally
+        run: |
+          echo "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}" > .env
+          echo "APP_JWT_SECRET=${{ secrets.APP_JWT_SECRET }}" >> .env
+
+      - name: Copy production files and .env to OCI Server
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          source: "docker-compose.prod.yml"
+          source: "docker-compose.prod.yml,.env"
           target: "~/agritech-end-to-end"
 
       - name: Deploy via SSH & Docker Compose
@@ -82,16 +87,6 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             cd ~/agritech-end-to-end
-            
-            # Write environment variables securely from secrets
-            echo "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}" > .env
-            echo "APP_JWT_SECRET=${{ secrets.APP_JWT_SECRET }}" >> .env
-
-            # Export them directly into the current shell session so compose interpolation sees them immediately
-            export POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
-            export APP_JWT_SECRET="${{ secrets.APP_JWT_SECRET }}"
-            
-            # Pull latest images and restart stack cleanly with explicit env-file
             docker compose --env-file .env -f docker-compose.prod.yml pull
             docker compose --env-file .env -f docker-compose.prod.yml down
             docker compose --env-file .env -f docker-compose.prod.yml up -d
