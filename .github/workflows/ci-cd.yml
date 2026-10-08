@@ -86,6 +86,10 @@ jobs:
             # Write environment variables securely from secrets
             echo "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}" > .env
             echo "APP_JWT_SECRET=${{ secrets.APP_JWT_SECRET }}" >> .env
+
+            # Export them directly into the current shell session so compose interpolation sees them immediately
+            export POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
+            export APP_JWT_SECRET="${{ secrets.APP_JWT_SECRET }}"
             
             # Pull latest images and restart stack cleanly with explicit env-file
             docker compose --env-file .env -f docker-compose.prod.yml pull
