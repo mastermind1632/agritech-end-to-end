@@ -67,7 +67,8 @@ jobs:
 
       - name: Generate .env file locally
         run: |
-          echo "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}" > .env
+          echo "DOCKER_REGISTRY_OWNER=${GITHUB_REPOSITORY_OWNER,,}" > .env
+          echo "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}" >> .env
           echo "APP_JWT_SECRET=${{ secrets.APP_JWT_SECRET }}" >> .env
 
       - name: Copy production files and .env to OCI Server
