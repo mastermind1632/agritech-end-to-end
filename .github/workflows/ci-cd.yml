@@ -87,7 +87,7 @@ jobs:
             echo "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}" > .env
             echo "APP_JWT_SECRET=${{ secrets.APP_JWT_SECRET }}" >> .env
             
-            # Pull latest images and restart stack cleanly
-            docker compose -f docker-compose.prod.yml pull
-            docker compose -f docker-compose.prod.yml down
-            docker compose -f docker-compose.prod.yml up -d
+            # Pull latest images and restart stack cleanly with explicit env-file
+            docker compose --env-file .env -f docker-compose.prod.yml pull
+            docker compose --env-file .env -f docker-compose.prod.yml down
+            docker compose --env-file .env -f docker-compose.prod.yml up -d
