@@ -123,6 +123,9 @@ existing OCI server using the configured GitHub secrets. All application images
 use the release commit tag. Deployment waits for the AI stack, checks backend
 health and verifies a real Qwen response. Ollama and LangChain remain internal;
 the browser uses the existing frontend and authenticated `/api` proxy.
+Production also publishes a CPU-only Ollama runtime from checksum-verified official
+release binaries. Its image excludes GPU libraries to fit the OCI server's disk
+capacity. Local Compose keeps the standard Ollama image unless `OLLAMA_IMAGE` is set.
 
 Tests: `./mvnw test`, `npm ci && npm run build` in `frontend`, and
 `python -m unittest discover -s tests -v` in `langchain-service` after installing

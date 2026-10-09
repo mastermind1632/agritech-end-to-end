@@ -81,6 +81,42 @@ jobs:
           cache-from: type=gha,scope=langchain
           cache-to: type=gha,mode=max,scope=langchain
 
+      - name: Publish CPU-only Ollama runtime
+        uses: docker/build-push-action@v6
+        with:
+          context: ./ollama-service
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ env.OWNER }}/agritech-ollama-cpu:latest
+            ghcr.io/${{ env.OWNER }}/agritech-ollama-cpu:${{ github.sha }}
+          cache-from: type=gha,scope=ollama-cpu
+          cache-to: type=gha,mode=max,scope=ollama-cpu
+
+      - name: Verify CPU-only model generation
+        env:
+          OLLAMA_IMAGE: ghcr.io/${{ env.OWNER }}/agritech-ollama-cpu:${{ github.sha }}
+        run: |
+          docker run -d --name ollama-cpu-smoke -p 127.0.0.1:11434:11434 "$OLLAMA_IMAGE"
+          trap 'docker rm -f ollama-cpu-smoke' EXIT
+          for attempt in $(seq 1 30); do
+            if docker exec ollama-cpu-smoke ollama list; then break; fi
+            echo "Waiting for Ollama (attempt $attempt)"
+            sleep 2
+          done
+          docker exec ollama-cpu-smoke ollama pull qwen2.5:0.5b
+          python - <<'PY'
+          import json
+          from urllib.request import Request, urlopen
+          body = {"model": "qwen2.5:0.5b", "prompt": "What should I check before buying crop seeds?",
+                  "stream": False, "options": {"num_predict": 40}}
+          request = Request("http://127.0.0.1:11434/api/generate", data=json.dumps(body).encode(),
+                            headers={"Content-Type": "application/json"})
+          with urlopen(request, timeout=180) as response:
+              assert json.load(response)["response"].strip(), "CPU-only runtime returned an empty answer"
+          print("CPU-only Qwen generation passed.")
+          PY
+
   langchain-test:
     runs-on: ubuntu-latest
     permissions:
@@ -135,6 +171,7 @@ jobs:
               "DOCKER_REGISTRY_OWNER": os.environ["GITHUB_REPOSITORY_OWNER"].lower(),
               "IMAGE_TAG": os.environ["GITHUB_SHA"],
               "AI_IMAGE_TAG": os.environ["GITHUB_SHA"],
+              "OLLAMA_IMAGE": "ghcr.io/" + os.environ["GITHUB_REPOSITORY_OWNER"].lower() + "/agritech-ollama-cpu:" + os.environ["GITHUB_SHA"],
               "POSTGRES_PASSWORD": os.environ["POSTGRES_PASSWORD"],
               "APP_JWT_SECRET": os.environ["APP_JWT_SECRET"],
               "AI_MODEL": "qwen2.5:0.5b",
@@ -173,6 +210,8 @@ jobs:
             set -eu
             cd ~/agritech-end-to-end
             chmod 600 .env
+            df -h /
+            docker system df
             printf '%s' "$GHCR_PAT" | docker login ghcr.io -u "$DOCKER_REGISTRY_OWNER" --password-stdin
             docker compose --env-file .env -f docker-compose.prod.yml -f docker-compose.ai.yml config --quiet
             docker compose --env-file .env -f docker-compose.prod.yml -f docker-compose.ai.yml pull
