@@ -55,6 +55,10 @@ The frontend container reverse-proxies `/api` to the Spring Boot service, so the
 
 ## Optional Qwen AI Services
 
+The Wednesday-to-Friday workflow now includes explicit LangGraph routing, JWT-isolated durable
+conversation memory, human approval for order reviews, and opt-in payload-redacted LangSmith
+tracing/evaluation. See [workflow implementation](docs/weekly-ai-workflow.md).
+
 Personalised buying opportunities, server-calculated price comparisons, published farming
 sources and a 12-case AI regression dataset are documented in [AI quality](docs/ai-quality.md).
 Product pack/specification fields are optional; unknown delivery and unconfirmed discounts
@@ -100,8 +104,9 @@ Grounding uses PostgreSQL full-text retrieval over curated farming guides,
 supplier products and open group orders. This is retrieval, not model training.
 Questions with no matching source are redirected to farming topics without a
 model call. Replies can still be wrong; source retrieval is not a guarantee.
-There are no autonomous tools, persistent conversation memory, or enabled
-LangSmith tracing. The analytics engine is the existing deterministic clustering,
+There are no autonomous purchase/payment tools. Conversation memory uses owned SQLite
+checkpoints; payload-redacted LangSmith spans are opt-in and require a private API key.
+The analytics engine is the existing deterministic clustering,
 nearest-profile comparison and population-based anomaly implementation.
 
 Empty farms are excluded from spending clusters and buying matches. Matching

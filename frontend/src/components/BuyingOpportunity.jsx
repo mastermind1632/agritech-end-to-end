@@ -7,7 +7,7 @@ const rand = value => {
     new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(number);
 };
 
-export default function BuyingOpportunity({ item, reviewOrder }) {
+export default function BuyingOpportunity({ item, reviewOrder, requestReview, reviewDisabled }) {
   const [opportunity, setOpportunity] = useState(item);
   const [quantity, setQuantity] = useState(1);
   const [busy, setBusy] = useState(false);
@@ -53,5 +53,8 @@ export default function BuyingOpportunity({ item, reviewOrder }) {
     <small>Prices checked: {new Date(quote.checkedAt).toLocaleString()}</small>
     {error && <p className="farm-error" role="alert">{error}</p>}
     <button className="text-button" onClick={() => reviewOrder(opportunity.suggestedGroupOrderId)}>Review this order</button>
+    <button className="secondary" disabled={reviewDisabled || busy || changed || !!error}
+      onClick={() => requestReview({ orderId: opportunity.suggestedGroupOrderId, quantity: quote.quantity })}>
+      Request assistant review</button>
   </article>;
 }

@@ -3,7 +3,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 LANGSMITH_TRACING=false
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-RUN useradd --create-home app
+RUN useradd --create-home app && mkdir -p /home/app/.local/share/agritech && chown -R app:app /home/app/.local && chmod 700 /home/app/.local/share/agritech
 COPY app ./app
 USER app
 EXPOSE 8001

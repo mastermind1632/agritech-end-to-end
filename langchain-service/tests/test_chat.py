@@ -38,7 +38,7 @@ class ChatTests(unittest.TestCase):
         self.assertEqual(result.status_code, 200)
         self.assertEqual(result.json()["response"], llm.answer)
         self.assertEqual(llm.seen[0].type, "system")
-        self.assertEqual(llm.seen[0].content, self.payload["system"])
+        self.assertTrue(llm.seen[0].content.startswith(self.payload["system"]))
         self.assertIn("listed price R450", llm.seen[1].content)
         self.assertEqual(factory.call_args.kwargs["model"], MODEL)
 
@@ -64,7 +64,7 @@ class ChatTests(unittest.TestCase):
     def test_health_checks_ollama_without_generating_text(self):
         with patch("app.main.Client") as runtime:
             result = self.client.get("/health")
-            self.assertEqual(result.json()["framework"], "langchain")
+            self.assertEqual(result.json()["framework"], "langgraph")
             runtime.return_value.list.assert_called_once()
 
 

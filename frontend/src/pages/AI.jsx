@@ -14,6 +14,9 @@ export default function AI({ farmer, setPage, reviewOrder }) {
   const [error, setError] = useState('');
   const [chatError, setChatError] = useState('');
   const [insights, setInsights] = useState(null);
+  const [conversationId, setConversationId] = useState(null);
+  const [approval, setApproval] = useState(null);
+  const [starting, setStarting] = useState(true);
   const pending = useRef(false);
   const session = useRef(0);
   const activeFarmer = useRef(farmer.id);
@@ -32,22 +35,89 @@ export default function AI({ farmer, setPage, reviewOrder }) {
   };
   useEffect(() => {
     activeFarmer.current = farmer.id;
-    setMessages([]); setInsights(null); setItems([]); setChatError('');
+    setMessages([]); setQuestion(''); setInsights(null); setItems([]); setChatError('');
+    setConversationId(null); setApproval(null); setStarting(true);
+    const key = `agritech_conversation_${farmer.id}`;
+    (async () => {
+      try {
+        let saved;
+        const existing = localStorage.getItem(key);
+        if (existing) {
+          try { saved = await assistantApi.conversation(existing); }
+          catch (e) { if (e.status !== 404) throw e; localStorage.removeItem(key); }
+        }
+        if (!saved) saved = await assistantApi.createConversation();
+        if (activeFarmer.current !== farmer.id) return;
+        setConversationId(saved.conversationId); setMessages(saved.messages || []); setApproval(saved.approval);
+        localStorage.setItem(key, saved.conversationId);
+      } catch (e) { if (activeFarmer.current === farmer.id) setChatError(e.message); }
+      finally { if (activeFarmer.current === farmer.id) setStarting(false); }
+    })();
     load();
     return () => { session.current++; activeFarmer.current = null; };
   }, [farmer.id]);
   const send = async (event) => {
     event.preventDefault();
     const prompt = question.trim();
-    if (!prompt || pending.current) return;
+    if (!prompt || pending.current || !conversationId || approval) return;
     const id = farmer.id;
     pending.current = true; setSending(true); setChatError('');
     setMessages(previous => [...previous, { role: 'user', text: prompt }]); setQuestion('');
     try {
-      const reply = await assistantApi.chat(prompt);
+      const reply = await assistantApi.turn(conversationId, prompt);
       if (activeFarmer.current === id) setMessages(previous => [...previous, { role: 'assistant', text: reply.response, sources: reply.sources }]);
-    } catch (e) { if (activeFarmer.current === id) { setChatError(e.message); setQuestion(prompt); } }
+    } catch (e) { if (activeFarmer.current === id) {
+      setChatError(e.message); setQuestion(prompt);
+      setMessages(previous => previous.at(-1)?.role === 'user' && previous.at(-1)?.text === prompt ? previous.slice(0, -1) : previous);
+      if (e.status === 409) {
+        try {
+          const saved = await assistantApi.conversation(conversationId);
+          if (activeFarmer.current === id) { setMessages(saved.messages || []); setApproval(saved.approval); }
+        } catch { /* Keep the original request error visible. */ }
+      }
+    } }
     finally { pending.current = false; setSending(false); }
+  };
+  const clearConversation = async () => {
+    if (pending.current) return;
+    const id = farmer.id;
+    pending.current = true; setStarting(true); setChatError('');
+    try {
+      if (conversationId) {
+        try { await assistantApi.deleteConversation(conversationId); }
+        catch (e) { if (e.status !== 404) throw e; }
+      }
+      if (activeFarmer.current !== id) return;
+      localStorage.removeItem(`agritech_conversation_${id}`);
+      setConversationId(null); setMessages([]); setQuestion(''); setApproval(null);
+      const saved = await assistantApi.createConversation();
+      if (activeFarmer.current !== id) return;
+      setConversationId(saved.conversationId); localStorage.setItem(`agritech_conversation_${id}`, saved.conversationId);
+    } catch (e) { if (activeFarmer.current === id) setChatError(e.message); }
+    finally { pending.current = false; if (activeFarmer.current === id) setStarting(false); }
+  };
+  const requestReview = async action => {
+    if (pending.current || !conversationId || approval) return;
+    const id = farmer.id;
+    pending.current = true; setSending(true); setChatError('');
+    try {
+      const reply = await assistantApi.turn(conversationId, 'Review my group-order buying opportunity', action);
+      if (activeFarmer.current === id) setApproval(reply.approval);
+    } catch (e) { if (activeFarmer.current === id) setChatError(e.message); }
+    finally { pending.current = false; if (activeFarmer.current === id) setSending(false); }
+  };
+  const resolveApproval = async approved => {
+    if (pending.current || !approval) return;
+    const id = farmer.id;
+    pending.current = true; setSending(true); setChatError('');
+    try {
+      const reply = await assistantApi.resume(conversationId, approval.interruptId, approved);
+      const saved = await assistantApi.conversation(conversationId);
+      if (activeFarmer.current !== id) return;
+      setMessages(saved.messages); setApproval(saved.approval);
+      if (reply.actionReady) reviewOrder(reply.actionReady.orderId, reply.actionReady.quantity);
+    } catch (e) { if (activeFarmer.current === id) setChatError(e.message); }
+    finally { pending.current = false; if (activeFarmer.current === id) setSending(false); }
   };
   const generate = async () => {
     const id = farmer.id;
@@ -61,9 +131,11 @@ export default function AI({ farmer, setPage, reviewOrder }) {
   return <>
     <div className="page-head"><div><p className="eyebrow">YOUR FARM</p><h1>Farm advice and buying insights</h1></div></div>
     <section className="farm-assistant" aria-labelledby="assistant-title">
-      <h2 id="assistant-title">Ask about your farm</h2>
+      <div className="farm-section-head"><h2 id="assistant-title">Ask about your farm</h2>
+        <button className="secondary" onClick={clearConversation} disabled={sending || starting}
+          title="Delete this conversation and start a new one">Clear conversation</button></div>
       <div className="farm-messages" aria-live="polite" aria-busy={sending}>
-        {messages.length === 0 && <p className="muted">What would you like to ask about seeds, farm costs or group buying?</p>}
+        {messages.length === 0 && !approval && !starting && <p className="muted">What would you like to ask about seeds, farm costs or group buying?</p>}
         {messages.map((message, index) => <article className={`farm-message ${message.role}`} key={index}>
           <strong>{message.role === 'user' ? 'You' : 'Farm assistant'}</strong><p>{message.text}</p>
           {!!message.sources?.length && <ul className="farm-sources">{message.sources.map(source => <li key={source.id}>
@@ -74,11 +146,22 @@ export default function AI({ farmer, setPage, reviewOrder }) {
           </li>)}</ul>}
         </article>)}
         {sending && <p role="status">Thinking...</p>}
+        {starting && <p role="status">Loading your conversation...</p>}
+        {approval && <section className="farm-approval" aria-labelledby="approval-title">
+          <h3 id="approval-title">Review required</h3>
+          <p>{approval.productName}: {approval.quantity} units</p>
+          <p>Listed total: R {Number(approval.quote.listedTotal).toFixed(2)}.
+            With the unconfirmed group discount: R {Number(approval.quote.indicativeGroupTotal).toFixed(2)}.</p>
+          <p>{approval.notice}</p>
+          <div className="farm-approval-actions"><button className="primary" disabled={sending}
+            onClick={() => resolveApproval(true)}>Continue to order review</button>
+            <button className="secondary" disabled={sending} onClick={() => resolveApproval(false)}>Cancel review</button></div>
+        </section>}
       </div>
       {chatError && <p className="farm-error" role="alert">{chatError}</p>}
       <form className="farm-question" onSubmit={send}>
-        <label className="farm-input"><span>Your question</span><input value={question} onChange={e => setQuestion(e.target.value)} maxLength={2000} disabled={sending} required /></label>
-        <button className="primary" disabled={sending || !question.trim()}>{sending ? 'Waiting...' : 'Ask'}</button>
+        <label className="farm-input"><span>Your question</span><input value={question} onChange={e => setQuestion(e.target.value)} maxLength={2000} disabled={sending || starting || !conversationId || !!approval} required /></label>
+        <button className="primary" disabled={sending || starting || !conversationId || !!approval || !question.trim()}>{sending ? 'Waiting...' : 'Ask'}</button>
       </form>
     </section>
     <section className="farm-insights" aria-busy={loading}>
@@ -105,7 +188,8 @@ export default function AI({ farmer, setPage, reviewOrder }) {
     <section className="farm-insights">
       <div className="farm-section-head"><h2>Group-buying opportunities</h2><button className="primary" onClick={generate} disabled={refreshing}>{refreshing ? 'Checking...' : 'Find opportunities'}</button></div>
       {items.length ? <div className="buying-opportunities">{items.map(item =>
-        <BuyingOpportunity key={item.id} item={item} reviewOrder={reviewOrder} />)}</div>
+        <BuyingOpportunity key={item.id} item={item} reviewOrder={reviewOrder} requestReview={requestReview}
+          reviewDisabled={sending || starting || !conversationId || !!approval} />)}</div>
         : <p className="muted">No open orders match your recorded purchases. Add your farm expenses to find relevant opportunities.</p>}
     </section>
   </>;

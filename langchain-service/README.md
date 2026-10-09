@@ -31,7 +31,10 @@ Defaults: `OLLAMA_BASE_URL=http://localhost:11434`, `AI_MODEL=qwen2.5:0.5b`. Spr
 
 This foundation step uses `create_agent(model=ChatOllama(...), tools=[], system_prompt=...)`. Autonomous tools are not enabled on the installed small model. Tool calling requires a supporting model and permission-scoped, tested tools. Do not use Python `eval` as a calculator.
 
-There is no persistent chat memory or shared checkpointer yet. Each request is independent so one farmer's context cannot enter another farmer's conversation. LangSmith tracing is disabled in Compose; do not enable external tracing of farmer data without permission. No LangSmith API key is needed.
+The conversation graph has durable, JWT-owned SQLite memory and approval checkpoints.
+Legacy generation requests remain independent. LangSmith graph spans are opt-in and payload-redacted;
+no API key is needed unless you enable uploads. See [weekly workflow](../docs/weekly-ai-workflow.md)
+for setup, privacy constraints and evaluation commands.
 
 Tests exercise the real LangChain agent with a local fake model, without external requests or model downloads:
 
