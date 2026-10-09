@@ -35,7 +35,9 @@ export async function api(path, options = {}) {
 
   if (!res.ok) {
     const msg = (data && typeof data === 'object' && (data.message || data.detail || data.error)) || (typeof data === 'string' && data) || '';
-    throw new Error(msg || `Request failed (${res.status})`);
+    const error = new Error(msg || `Request failed (${res.status})`);
+    error.status = res.status;
+    throw error;
   }
   return data;
 }
@@ -71,8 +73,23 @@ export const groupApi = {
   join: (id, body) => api(`/group-orders/${id}/join`, { method: 'POST', body: JSON.stringify(body) })
 };
 export const recommendationApi = {
+  quote: (id, quantity) => api(`/recommendations/${encodeURIComponent(id)}/quote?quantity=${encodeURIComponent(quantity)}`),
   list: (id) => api(`/recommendations/farmer/${id}`),
   generate: (id) => api('/recommendations/generate', { method: 'POST', body: JSON.stringify({ farmerId: id }) })
+};
+
+export const assistantApi = {
+  createConversation: () => api('/ai/conversations', { method: 'POST' }),
+  conversation: id => api(`/ai/conversations/${encodeURIComponent(id)}`),
+  deleteConversation: id => api(`/ai/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  turn: (id, prompt, action) => api(`/ai/conversations/${encodeURIComponent(id)}/turn`,
+    { method: 'POST', body: JSON.stringify({ prompt, action }) }),
+  resume: (id, interruptId, approved) => api(`/ai/conversations/${encodeURIComponent(id)}/resume`,
+    { method: 'POST', body: JSON.stringify({ interruptId, approved }) }),
+  chat: (prompt) => api('/ai/chat', { method: 'POST', body: JSON.stringify({ prompt }) }),
+  buyingGroup: () => api('/ai/farmer-clusters'),
+  similar: (id) => api(`/ai/farmers/${encodeURIComponent(id)}/nearest`),
+  alerts: (id) => api(`/ai/farmers/${encodeURIComponent(id)}/anomalies`)
 };
 
 Object.assign(marketApi, {

@@ -1,0 +1,54 @@
+.farm-assistant,.farm-insights{margin:0 48px;padding:24px 0;border-top:1px solid var(--line)}
+.farm-assistant h2,.farm-insights h2{font-size:20px;margin:0 0 18px;letter-spacing:0}
+.farm-messages{min-height:140px;max-height:440px;overflow-y:auto;padding-right:8px}
+.farm-message{padding:16px;margin:12px 0;max-width:90%;border:1px solid var(--line);border-radius:8px;background:white;overflow-wrap:anywhere}
+.farm-message.user{margin-left:auto;background:var(--mint)}
+.farm-message p{white-space:pre-wrap;line-height:1.6;margin:8px 0}
+.farm-message small{color:var(--muted)}
+.farm-question{display:flex;align-items:end;gap:12px;margin-top:20px}
+.farm-input{flex:1;min-width:0;display:grid;gap:8px}
+.farm-input input{width:100%;padding:12px;border:1px solid var(--line);border-radius:8px;background:white}
+.farm-question button{min-height:44px;min-width:80px}
+.farm-error{color:var(--red);overflow-wrap:anywhere}
+.farm-section-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+.farm-section-head h2{margin:0}
+.farm-comparisons{list-style:none;padding:0;margin:0 0 24px}
+.farm-comparisons li{padding:16px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.farm-comparisons p{line-height:1.5}
+.farm-comparison-totals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;margin:0 0 20px}
+.farm-comparison-totals dt{font-size:14px;color:var(--muted);line-height:1.5}
+.farm-comparison-totals dd{font-size:22px;font-weight:700;margin:8px 0 0}
+.farm-match-summary{list-style:none;padding:0;margin:0 0 20px;max-width:760px}
+.farm-match-summary li{display:flex;align-items:baseline;justify-content:space-between;gap:20px;padding:12px 0;border-bottom:1px solid var(--line)}
+.farm-match-summary span{min-width:0;overflow-wrap:anywhere;line-height:1.5}
+.farm-match-summary strong{white-space:nowrap;font-size:14px}
+@media(max-width:650px){.farm-comparison-totals{grid-template-columns:1fr;gap:16px}.farm-comparison-totals dd{font-size:20px}}
+@media(max-width:1000px){.farm-assistant,.farm-insights{margin:0 25px}.app-shell:has(.farm-assistant) .sidebar .brand>div:last-child,.app-shell:has(.farm-assistant) .sidebar .mini-profile>div:last-child{display:none}.app-shell:has(.farm-assistant) .sidebar .icon{font-size:18px}}
+@media(max-width:650px){.farm-assistant,.farm-insights{margin:0 18px}.farm-message{max-width:100%}.farm-question{flex-wrap:wrap}.farm-input{flex-basis:100%}}
+.buying-opportunities { display: grid; gap: 18px; }
+.buying-opportunity { border: 1px solid #dbe5df; border-radius: 8px; padding: 20px; background: white; }
+.buying-opportunity h3 { margin: 0 0 12px; }
+.buying-quantity { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; }
+.buying-quantity label { display: grid; gap: 6px; }
+.buying-quantity input { width: 120px; height: 42px; padding: 8px 12px; border: 1px solid #b9cec2; border-radius: 4px; font: inherit; }
+.buying-opportunity .text-button { min-height: 40px; font-size: 14px; margin-top: 8px; }
+.buying-prices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.buying-prices dt { color: #52635d; font-size: 14px; }
+.buying-prices dd { margin: 8px 0 0; font-size: 20px; font-weight: 700; }
+.buying-caution { color: #75540a; font-size: 14px; }
+.buying-opportunity small { display: block; color: #52635d; }
+.farm-sources { padding-left: 18px; font-size: 13px; }
+.farm-sources small { display: block; }
+@media (max-width: 600px) { .buying-prices { grid-template-columns: 1fr; } .buying-opportunity { padding: 16px; } }
+.buying-alternatives ul { padding: 0; list-style: none; }
+.buying-alternatives li { display: flex; gap: 12px; justify-content: space-between; flex-wrap: wrap; padding: 12px 0; border-bottom: 1px solid #dbe5df; }
+.buying-alternatives strong { white-space: nowrap; }
+.farm-approval { border-top: 2px solid #b77a0a; padding: 16px 0; }
+.farm-approval h3 { font-size: 18px; margin: 0 0 12px; }
+.farm-approval-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+.farm-approval-actions button { white-space: normal; }
+@media (max-width: 1000px) {
+  .app-shell:has(.farm-assistant) .sidebar nav { min-width: 0; width: 100%; grid-template-columns: minmax(0, 1fr); }
+  .app-shell:has(.farm-assistant) .sidebar nav button { position: relative; min-width: 0; width: 100%; padding: 12px 0; gap: 0; justify-content: center; border-radius: 6px; }
+  .app-shell:has(.farm-assistant) .sidebar nav em { position: absolute; right: -2px; top: 0; padding: 1px 3px; font-size: 9px; border-radius: 4px; }
+}

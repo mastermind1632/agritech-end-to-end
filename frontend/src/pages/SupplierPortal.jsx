@@ -4,7 +4,7 @@ import useLive from '../hooks/useLive';
 import { api, marketApi } from '../lib/api';
 
 const emptySupplier = { name: '', location: '', contact: '' };
-const emptyProduct = { productName: '', price: '' };
+const emptyProduct = { productName: '', price: '', comparisonKey: '', packSize: '', packUnit: '' };
 
 export default function SupplierPortal() {
   const [suppliers, setSuppliers] = useState([]);
@@ -57,10 +57,12 @@ export default function SupplierPortal() {
   };
 
   const openNewProduct = () => { setPForm(emptyProduct); setError(''); setProductModal('new'); };
-  const openEditProduct = (p) => { setPForm({ productName: p.productName, price: String(p.price) }); setError(''); setProductModal(p); };
+  const openEditProduct = (p) => { setPForm({ productName: p.productName, price: String(p.price),
+    comparisonKey: p.comparisonKey || '', packSize: p.packSize == null ? '' : String(p.packSize), packUnit: p.packUnit || '' }); setError(''); setProductModal(p); };
   const saveProduct = (e) => {
     e.preventDefault();
-    const body = { productName: pForm.productName, price: Number(pForm.price) };
+    const body = { productName: pForm.productName, price: Number(pForm.price), comparisonKey: pForm.comparisonKey,
+      packSize: pForm.packSize === '' ? null : Number(pForm.packSize), packUnit: pForm.packUnit };
     run(async () => {
       if (productModal === 'new') { await marketApi.addProduct(selected, body); note('Product saved to the database.'); }
       else { await marketApi.updateProduct(productModal.id, body); note('Product updated.'); }
@@ -135,6 +137,13 @@ export default function SupplierPortal() {
         <form onSubmit={saveProduct} className="modal-form">
           <label>Product name<input value={pForm.productName} onChange={(e) => setPForm({ ...pForm, productName: e.target.value })} placeholder="50kg NPK fertilizer" required /></label>
           <label>Price (ZAR)<input type="number" min="0" step="0.01" inputMode="decimal" value={pForm.price} onChange={(e) => setPForm({ ...pForm, price: e.target.value })} required /></label>
+          <label>Product specification code (optional)<input maxLength={150} value={pForm.comparisonKey}
+            onChange={e => setPForm({ ...pForm, comparisonKey: e.target.value })} /></label>
+          <label>Pack size<input type="number" min="0.001" max="999999999.999" step="0.001" value={pForm.packSize}
+            onChange={e => setPForm({ ...pForm, packSize: e.target.value })} required={!!pForm.comparisonKey} /></label>
+          <label>Pack unit<select value={pForm.packUnit} onChange={e => setPForm({ ...pForm, packUnit: e.target.value })}
+            required={!!pForm.comparisonKey}><option value="">Not recorded</option><option value="kg">kg</option>
+            <option value="l">litres</option><option value="unit">units</option></select></label>
           {error && <div className="error" style={{ margin: 0 }}>{error}</div>}
           <button className="primary full" disabled={busy}>{busy ? 'Saving…' : 'Save product →'}</button>
         </form>

@@ -1,0 +1,59 @@
+# Opt-in overlay: docker compose -f docker-compose.yml -f docker-compose.ai.yml up -d --build
+services:
+  spring-app:
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      AI_LANGCHAIN_URL: http://langchain-service:8001
+      AI_MODEL: ${AI_MODEL:-qwen2.5:0.5b}
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ai_models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  ollama-model:
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/ollama"]
+    command: ["pull", "${AI_MODEL:-qwen2.5:0.5b}"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+
+  langchain-service:
+    image: ghcr.io/${DOCKER_REGISTRY_OWNER:-mastermind1632}/agritech-langchain:${AI_IMAGE_TAG:-latest}
+    build: ./langchain-service
+    restart: unless-stopped
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      AI_MODEL: ${AI_MODEL:-qwen2.5:0.5b}
+      AI_BACKEND_URL: http://spring-app:8080
+      AI_CHECKPOINT_DB: /home/app/.local/share/agritech/checkpoints.sqlite
+      LANGSMITH_TRACING: "false"
+      AI_LANGSMITH_TRACING: ${AI_LANGSMITH_TRACING:-false}
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+      LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-agritech-graph}
+      LANGSMITH_WORKSPACE_ID: ${LANGSMITH_WORKSPACE_ID:-}
+    volumes:
+      - ai_conversations:/home/app/.local/share/agritech
+    depends_on:
+      ollama-model:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=8)"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  ai_models:
+  ai_conversations:

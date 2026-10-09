@@ -2,9 +2,13 @@ name: AgriFinance CI/CD
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/lema-ai-services]
   pull_request:
     branches: [main]
+
+concurrency:
+  group: agritech-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   test:
@@ -22,8 +26,8 @@ jobs:
       - run: ./mvnw -B clean verify
 
   publish:
-    needs: test
-    if: github.event_name == 'push'
+    needs: [test, langchain-test, frontend-build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -32,18 +36,18 @@ jobs:
       - uses: actions/checkout@v4
       - name: Lowercase owner (GHCR requires lowercase)
         run: echo "OWNER=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
-      
+
       - name: Set up QEMU (for multi-arch builds)
         uses: docker/setup-qemu-action@v3
-        
+
       - uses: docker/setup-buildx-action@v3
-      
+
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          
+
       - uses: docker/build-push-action@v6
         with:
           context: .
@@ -54,7 +58,7 @@ jobs:
             ghcr.io/${{ env.OWNER }}/agritech-api:${{ github.sha }}
           cache-from: type=gha,scope=api
           cache-to: type=gha,mode=max,scope=api
-          
+
       - uses: docker/build-push-action@v6
         with:
           context: ./frontend
@@ -66,38 +70,125 @@ jobs:
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
 
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./langchain-service
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ env.OWNER }}/agritech-langchain:latest
+            ghcr.io/${{ env.OWNER }}/agritech-langchain:${{ github.sha }}
+          cache-from: type=gha,scope=langchain
+          cache-to: type=gha,mode=max,scope=langchain
+
+  langchain-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: langchain-service/requirements.txt
+      - run: python -m pip install -r langchain-service/requirements.txt
+      - run: python -m unittest discover -s tests -v
+        working-directory: langchain-service
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+      - run: npm test
+        working-directory: frontend
   deploy:
     needs: publish
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Generate .env file locally
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          APP_JWT_SECRET: ${{ secrets.APP_JWT_SECRET }}
         run: |
-          echo "DOCKER_REGISTRY_OWNER=${GITHUB_REPOSITORY_OWNER,,}" > .env
-          echo "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}" >> .env
-          echo "APP_JWT_SECRET=${{ secrets.APP_JWT_SECRET }}" >> .env
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          values = {
+              "DOCKER_REGISTRY_OWNER": os.environ["GITHUB_REPOSITORY_OWNER"].lower(),
+              "IMAGE_TAG": os.environ["GITHUB_SHA"],
+              "AI_IMAGE_TAG": os.environ["GITHUB_SHA"],
+              "POSTGRES_PASSWORD": os.environ["POSTGRES_PASSWORD"],
+              "APP_JWT_SECRET": os.environ["APP_JWT_SECRET"],
+              "AI_MODEL": "qwen2.5:0.5b",
+              "AI_LANGSMITH_TRACING": "false",
+          }
+          assert values["POSTGRES_PASSWORD"], "POSTGRES_PASSWORD is required"
+          assert len(values["APP_JWT_SECRET"]) >= 32, "APP_JWT_SECRET must have at least 32 characters"
+          assert all("\n" not in value and "\r" not in value for value in values.values()), "Environment values must be single-line"
+          def quoted(value):
+              return "'" + value.replace("'", "\\'") + "'"
+          Path(".env").write_text("".join(key + "=" + quoted(value) + "\n" for key, value in values.items()))
+          Path(".env").chmod(0o600)
+          PY
 
       - name: Copy production files and .env to OCI Server
-        uses: appleboy/scp-action@master
+        uses: appleboy/scp-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          source: "docker-compose.prod.yml,.env"
+          source: "docker-compose.prod.yml,docker-compose.ai.yml,.env"
           target: "~/agritech-end-to-end"
 
       - name: Deploy via SSH & Docker Compose
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1
+        env:
+          GHCR_PAT: ${{ secrets.GHCR_PAT }}
+          DOCKER_REGISTRY_OWNER: ${{ github.repository_owner }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          envs: GHCR_PAT,DOCKER_REGISTRY_OWNER
+          command_timeout: 30m
           script: |
+            set -eu
             cd ~/agritech-end-to-end
-            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u mastermind1632 --password-stdin
-            docker compose --env-file .env -f docker-compose.prod.yml pull
-            docker compose --env-file .env -f docker-compose.prod.yml down
-            docker compose --env-file .env -f docker-compose.prod.yml up -d
+            chmod 600 .env
+            printf '%s' "$GHCR_PAT" | docker login ghcr.io -u "$DOCKER_REGISTRY_OWNER" --password-stdin
+            docker compose --env-file .env -f docker-compose.prod.yml -f docker-compose.ai.yml config --quiet
+            docker compose --env-file .env -f docker-compose.prod.yml -f docker-compose.ai.yml pull
+            docker compose --env-file .env -f docker-compose.prod.yml -f docker-compose.ai.yml up -d --no-build --wait --wait-timeout 900
+            docker compose --env-file .env -f docker-compose.prod.yml -f docker-compose.ai.yml exec -T langchain-service python - <<'PY'
+            import json
+            from urllib.request import Request, urlopen
+            with urlopen("http://spring-app:8080/actuator/health", timeout=30) as response:
+                assert json.load(response)["status"] == "UP", "Backend is unhealthy"
+            body = {"model": "qwen2.5:0.5b", "system": "Give a short farming answer using the supplied fact.",
+                    "prompt": "Crop seed buyers should check germination. What should they check?",
+                    "options": {"num_predict": 60, "temperature": 0}}
+            request = Request("http://127.0.0.1:8001/api/generate", data=json.dumps(body).encode(),
+                              headers={"Content-Type": "application/json"})
+            with urlopen(request, timeout=240) as response:
+                assert json.load(response)["response"].strip(), "AI returned an empty answer"
+            print("Production backend health and real Qwen generation passed.")
+            PY
+            curl --fail --silent --show-error http://127.0.0.1:8080/actuator/health
