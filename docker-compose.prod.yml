@@ -15,7 +15,7 @@ services:
       retries: 10
 
   spring-app:
-    image: ghcr.io/yourusername/agritech-api:latest
+    image: ghcr.io/${DOCKER_REGISTRY_OWNER:-mastermind1632}/agritech-api:${IMAGE_TAG:-latest}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -25,12 +25,13 @@ services:
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       APP_JWT_SECRET: ${APP_JWT_SECRET:?set APP_JWT_SECRET in .env}
+      APP_CORS_ALLOWED_ORIGINS: http://84.8.135.181:8080
 
   frontend:
-    image: ghcr.io/yourusername/agritech-web:latest
+    image: ghcr.io/${DOCKER_REGISTRY_OWNER:-mastermind1632}/agritech-web:${IMAGE_TAG:-latest}
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "8080:80"
     depends_on:
       - spring-app
 

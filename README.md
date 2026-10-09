@@ -117,11 +117,12 @@ summarizes shared signals without anonymous numbered farmer rows; a farm may
 appear in more than one signal category. Nearest matches are capped at five in
 the UI and can differ from the overall spending-cluster count.
 
-Production can combine `docker-compose.prod.yml` with `docker-compose.ai.yml`;
-configure the existing production API/web image names and secrets first. The
-LangChain image is published alongside those images after merging to `main`.
-Serve the frontend and `/api` behind stable HTTPS. This migration does not set
-up public hosting, copy the old temporary tunnel, or redirect the old deployment.
+Pushes to `main` test and publish the API, web and LangChain images for AMD64 and
+ARM64, then deploy `docker-compose.prod.yml` with `docker-compose.ai.yml` to the
+existing OCI server using the configured GitHub secrets. All application images
+use the release commit tag. Deployment waits for the AI stack, checks backend
+health and verifies a real Qwen response. Ollama and LangChain remain internal;
+the browser uses the existing frontend and authenticated `/api` proxy.
 
 Tests: `./mvnw test`, `npm ci && npm run build` in `frontend`, and
 `python -m unittest discover -s tests -v` in `langchain-service` after installing

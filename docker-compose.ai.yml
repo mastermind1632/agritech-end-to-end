@@ -29,7 +29,7 @@ services:
     restart: "no"
 
   langchain-service:
-    image: ghcr.io/mastermind1632/agritech-langchain:${AI_IMAGE_TAG:-latest}
+    image: ghcr.io/${DOCKER_REGISTRY_OWNER:-mastermind1632}/agritech-langchain:${AI_IMAGE_TAG:-latest}
     build: ./langchain-service
     restart: unless-stopped
     environment:
