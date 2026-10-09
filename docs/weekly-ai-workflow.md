@@ -68,10 +68,12 @@ Configure privately in the deployment environment, not source control:
 AI_LANGSMITH_TRACING=true
 LANGSMITH_API_KEY=<private key>
 LANGSMITH_PROJECT=agritech-graph
+LANGSMITH_WORKSPACE_ID=<workspace ID if required by the key>
 ```
 
-No key is currently configured in this workspace. Actual LangSmith delivery cannot be verified
-until a key is supplied and the service restarted. The wiring is covered by mocked SDK tests.
+Actual LangSmith delivery requires a privately configured key and a service restart.
+Keys scoped to multiple workspaces also require `LANGSMITH_WORKSPACE_ID`.
+The wiring is covered by mocked SDK tests; confirm delivery in your configured project.
 Use LangSmith's project view to inspect the graph/node/LLM hierarchy; raw conversations
 are intentionally absent.
 

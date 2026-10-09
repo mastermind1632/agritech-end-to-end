@@ -41,6 +41,7 @@ services:
       AI_LANGSMITH_TRACING: ${AI_LANGSMITH_TRACING:-false}
       LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
       LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-agritech-graph}
+      LANGSMITH_WORKSPACE_ID: ${LANGSMITH_WORKSPACE_ID:-}
     volumes:
       - ai_conversations:/home/app/.local/share/agritech
     depends_on:
