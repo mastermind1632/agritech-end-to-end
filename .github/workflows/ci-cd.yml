@@ -311,19 +311,18 @@ jobs:
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
           DOCKER_REGISTRY_OWNER: ${{ github.repository_owner }}
           RELEASE_SHA: ${{ github.sha }}
+          RELEASE_HTTPS: 'false'
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: GHCR_PAT,DOCKER_REGISTRY_OWNER,RELEASE_SHA
+          envs: GHCR_PAT,DOCKER_REGISTRY_OWNER,RELEASE_SHA,RELEASE_HTTPS
           command_timeout: 30m
           script: |
             set -eu
             cd ~/agritech-end-to-end
             sh scripts/deploy-production.sh
 
-      - name: Verify public encrypted release
+      - name: Verify public HTTP test release
         run: |
-          curl --retry 3 --retry-all-errors --connect-timeout 15 --max-time 45 --fail --silent --show-error https://84.8.135.181:8080/actuator/health
-          status=$(curl --silent --output /dev/null --write-out '%{http_code}' http://84.8.135.181:8080/)
-          test "$status" = 308
+          curl --retry 3 --retry-all-errors --connect-timeout 15 --max-time 45 --fail --silent --show-error http://84.8.135.181:8080/actuator/health

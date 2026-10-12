@@ -10,6 +10,7 @@ import Notifications from './pages/Notifications';
 import SupplierPortal from './pages/SupplierPortal';
 import Chat from './pages/Chat';
 import Profile from './pages/Profile';
+import DeploymentNotice from './components/DeploymentNotice';
 import Intelligence from './pages/Intelligence';
 import useFarmerNotices from './hooks/useFarmerNotices';
 
@@ -23,6 +24,7 @@ function Shell({ farmer, onLogout, onProductionSaved }) {
   const Page = PAGES[page] || SupplierPortal;
   return (
     <Layout page={page} setPage={setPage} farmer={farmer} onLogout={onLogout} noticeCount={notices.unread}>
+      <DeploymentNotice />
       <Page farmer={farmer} setPage={setPage} notices={notices} reviewOrder={reviewOrder}
         onProductionSaved={onProductionSaved}
         initialOrderId={initialOrder?.id} initialOrderQuantity={initialOrder?.quantity}
@@ -43,7 +45,7 @@ export default function App() {
   const logout = () => {
     localStorage.removeItem('agritech_farmer'); localStorage.removeItem('agritech_token'); setFarmer(null);
   };
-  if (!farmer) return <Login onLogin={login} />;
+  if (!farmer) return <><DeploymentNotice /><Login onLogin={login} /></>;
   const productionSaved = () => {
     const updated = { ...farmer, setupProfile: false };
     localStorage.setItem('agritech_farmer', JSON.stringify(updated));

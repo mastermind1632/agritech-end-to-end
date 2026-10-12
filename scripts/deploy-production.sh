@@ -7,8 +7,13 @@ test -f "$backup/.env"
 chmod 600 .env
 
 compose() {
-    docker compose --env-file .env -f docker-compose.prod.yml -f docker-compose.ai.yml \
-        -f docker-compose.segmentation.yml -f docker-compose.https.yml "$@"
+    if [ "${RELEASE_HTTPS:-false}" = true ]; then
+        docker compose --env-file .env -f docker-compose.prod.yml -f docker-compose.ai.yml \
+            -f docker-compose.segmentation.yml -f docker-compose.https.yml "$@"
+    else
+        docker compose --env-file .env -f docker-compose.prod.yml -f docker-compose.ai.yml \
+            -f docker-compose.segmentation.yml "$@"
+    fi
 }
 
 rollback() {
@@ -52,11 +57,16 @@ with urlopen(request, timeout=240) as response:
     assert json.load(response)['response'].strip(), 'AI returned an empty answer'
 print('Existing grounded Qwen assistant passed real generation.')
 PY
-curl --fail --silent --show-error --max-time 30 --resolve 84.8.135.181:8080:127.0.0.1 \
-    https://84.8.135.181:8080/actuator/health
-status=$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8080/)
-test "$status" = 308
-sh scripts/install-certificate-renewal.sh
+if [ "${RELEASE_HTTPS:-false}" = true ]; then
+    curl --fail --silent --show-error --max-time 30 --resolve 84.8.135.181:8080:127.0.0.1 \
+        https://84.8.135.181:8080/actuator/health
+    status=$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8080/)
+    test "$status" = 308
+    sh scripts/install-certificate-renewal.sh
+else
+    curl --fail --silent --show-error --max-time 30 http://127.0.0.1:8080/actuator/health
+    echo 'HTTP test deployment only. Do not enter real GPS, banking or other sensitive information.'
+fi
 df -h /
-echo 'Production segmentation, original assistant, trusted HTTPS and legacy-port redirect verified.'
+echo 'Live segmentation and original assistant verified.'
 trap - EXIT

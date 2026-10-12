@@ -67,26 +67,30 @@ Keep the service internal; it does not expose PostgreSQL, a training API or MLfl
 docker compose -f docker-compose.yml -f docker-compose.segmentation.yml up -d --build
 ```
 
-For production, include the existing production and AI overlays:
+For a live HTTP test deployment, include the existing production and AI overlays:
 
 ```sh
-docker compose -f docker-compose.prod.yml -f docker-compose.ai.yml -f docker-compose.segmentation.yml -f docker-compose.https.yml up -d --wait
+docker compose -f docker-compose.prod.yml -f docker-compose.ai.yml -f docker-compose.segmentation.yml up -d --wait
 ```
 
 The GitHub workflow tests the segmentation service against an isolated PostgreSQL database,
 builds AMD64/ARM64 images and includes the overlay in deployment on a successful main push.
 This is deployment configuration, not evidence that this new release has already been published.
 Back up both `postgres_data` and `segmentation_data`; test restores and disk capacity before release.
-Production currently uses HTTP: HTTPS must be configured before collecting real GPS, banking
-consent or other sensitive information. Consent controls alone are not a POPIA compliance certification.
+The live test address is `http://84.8.135.181:8080`. Ports 80 and 443 are blocked by the cloud
+firewall, so external IP-certificate validation currently fails. The UI warns that this is an
+unencrypted test deployment: use synthetic data only. HTTPS must be configured before collecting
+real GPS, banking information or other sensitive records. Consent controls alone are not a
+POPIA compliance certification.
 
-The prepared HTTPS configuration retains port 8080 and uses a trusted IP certificate. Port 443
-is currently blocked by the cloud firewall. The alternative certificate-maintenance method
+The prepared HTTPS configuration retains port 8080 and requires a trusted IP certificate. The certificate-maintenance method
 uses a trusted ephemeral container with Docker-socket access to publish and remove one public
 ACME validation token in the existing port-80 frontend; it does not reconfigure or restart that
-application. This method requires explicit owner approval before execution. Its path and
+application. The user approved this approach, but issuance is blocked by the cloud's port-80 rule. Its path and
 project restrictions are covered by tests. Certificate renewal must be scheduled before release;
-short-lived certificates must not depend on a person remembering to renew them.
+short-lived certificates must not depend on a person remembering to renew them. Certificate
+maintenance is not enabled in the HTTP test release. After the cloud owner opens the required
+port and a trusted certificate is issued, use the HTTPS overlay and `RELEASE_HTTPS=true`.
 
 ## Operations and demonstration
 

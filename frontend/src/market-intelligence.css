@@ -46,3 +46,4 @@
   .production-actions > button { max-width: 100%; white-space: normal; }
   .mi-tabs { gap: 18px; font-size: 13px; }
 }
+.deployment-notice { padding: 12px 20px; background: #fff2cf; border-bottom: 1px solid #e8cf88; color: #695015; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
