@@ -4,9 +4,9 @@ export default function Notifications({ notices }) {
     <>
       <div className="page-head">
         <div>
-          <p className="eyebrow">ACTIVITY CENTER</p>
+          <p className="eyebrow">UPDATES</p>
           <h1>Notifications</h1>
-          <p className="muted">Group orders, your commitments and AI insights. Updates automatically.</p>
+          <p className="muted">Group orders you joined, new offers and buying tips. This page refreshes by itself.</p>
         </div>
         <button className="secondary" onClick={markAllRead} disabled={!unread}>Mark all as read</button>
       </div>
@@ -25,7 +25,7 @@ export default function Notifications({ notices }) {
         ))}
         {!events.length && !loading && (
           <div className="empty"><span>o</span><b>Nothing yet</b>
-            <p>Create or join a group order, or generate AI insights, and the activity will show up here.</p></div>
+            <p>Join a group order or check your Buying Tips, and your updates will appear here.</p></div>
         )}
       </section>
     </>

@@ -18,7 +18,7 @@ async function prepare(file) {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
   const blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.88));
-  if (!blob) throw new Error('Could not process that image');
+  if (!blob) throw new Error('We could not read that photo. Please try a different one.');
   return new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
 }
 
@@ -65,7 +65,7 @@ export default function Profile({ farmer, onProductionSaved }) {
         <div>
           <p className="eyebrow">ACCOUNT</p>
           <h1>Farmer profile</h1>
-          <p className="muted">Your identity and workspace details.</p>
+          <p className="muted">Your name, location and photo.</p>
         </div>
       </div>
       {ok && <div className="notice">{ok}</div>}

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import useLive from './useLive';
 import { groupApi, marketApi, recommendationApi } from '../lib/api';
 
-// Builds a farmer-facing activity feed from data the backend already exposes.
+// Builds the farmer's updates feed (joined orders, open offers, buying tips).
 export default function useFarmerNotices(farmerId) {
   const key = 'agritech_notices_seen_' + farmerId;
   const [seen, setSeen] = useState(() => {
@@ -37,7 +37,7 @@ export default function useFarmerNotices(farmerId) {
         text: Number(o.discountRate) + '% discount, ' + pct + '% filled (' + o.currentQuantity + ' of ' + o.targetQuantity + ' units).' });
     });
     (recs || []).forEach((r) => events.push({ id: 'rec-' + r.id, type: 'insight', mark: 'i', time: r.createdAt,
-      title: 'AI buying insight', text: r.reason }));
+      title: 'Buying tip', text: r.reason }));
     events.sort((a, b) => String(b.time).localeCompare(String(a.time)));
     return events;
   }, [farmerId], { interval: 20000 });

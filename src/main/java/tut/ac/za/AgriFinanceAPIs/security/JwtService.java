@@ -1,5 +1,6 @@
 package tut.ac.za.AgriFinanceAPIs.security;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,6 +16,8 @@ public class JwtService {
     private final SecretKey key;
     private final long expirationSeconds;
 
+    public record TokenInfo(String subject, String role) { }
+
     public JwtService(@Value("${app.security.jwt-secret}") String secret,
                       @Value("${app.security.jwt-expiration-seconds:86400}") long expirationSeconds) {
         if (secret == null || secret.length() < 32) throw new IllegalArgumentException("app.security.jwt-secret (env APP_JWT_SECRET) must contain at least 32 characters");
@@ -22,14 +25,26 @@ public class JwtService {
         this.expirationSeconds = expirationSeconds;
     }
 
-    public String createToken(String farmerId, String contact) {
+    public String createToken(String farmerId, String contact, String role) {
         Instant now = Instant.now();
-        return Jwts.builder().subject(farmerId).claim("contact", contact)
+        return Jwts.builder().subject(farmerId).claim("contact", contact).claim("role", role)
                 .issuedAt(Date.from(now)).expiration(Date.from(now.plusSeconds(expirationSeconds)))
                 .signWith(key).compact();
     }
 
+    /** Kept so any older caller still compiles; new tokens default to FARMER. */
+    public String createToken(String farmerId, String contact) {
+        return createToken(farmerId, contact, "FARMER");
+    }
+
+    public TokenInfo parse(String token) {
+        Claims claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+        String role = claims.get("role", String.class);
+        // Only two known roles; anything else (or an old token without a role) is a plain farmer.
+        return new TokenInfo(claims.getSubject(), "ADMIN".equals(role) ? "ADMIN" : "FARMER");
+    }
+
     public String subject(String token) {
-        return Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload().getSubject();
+        return parse(token).subject();
     }
 }

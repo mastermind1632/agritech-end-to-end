@@ -24,13 +24,13 @@ public class FarmerController {
     @ResponseStatus(HttpStatus.CREATED)
     public AuthResponse register(@RequestBody RegisterRequest request) {
         var farmer = farmerService.register(request.getName(), request.getLocation(), request.getContact(), request.getPassword());
-        return new AuthResponse(jwtService.createToken(farmer.getId(), farmer.getContact()), new FarmerResponse(farmer));
+        return new AuthResponse(jwtService.createToken(farmer.getId(), farmer.getContact(), farmer.getRole()), new FarmerResponse(farmer));
     }
 
     @PostMapping("/login")
     public AuthResponse login(@RequestBody LoginRequest request) {
         var farmer = farmerService.login(request.getContact(), request.getPassword());
-        return new AuthResponse(jwtService.createToken(farmer.getId(), farmer.getContact()), new FarmerResponse(farmer));
+        return new AuthResponse(jwtService.createToken(farmer.getId(), farmer.getContact(), farmer.getRole()), new FarmerResponse(farmer));
     }
 
     @GetMapping("/{id}")

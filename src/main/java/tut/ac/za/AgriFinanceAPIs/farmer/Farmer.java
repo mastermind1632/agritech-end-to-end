@@ -29,6 +29,10 @@ public class Farmer {
     @Column(name = "password_hash", length = 255)
     private String passwordHash;
 
+    /** FARMER (default) or ADMIN. Nullable so existing rows keep working; null is treated as FARMER. */
+    @Column(length = 20)
+    private String role;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -39,6 +43,7 @@ public class Farmer {
     public void prePersist() {
         if (id == null) id = UUID.randomUUID().toString();
         if (createdAt == null) createdAt = LocalDateTime.now();
+        if (role == null || role.isBlank()) role = "FARMER";
     }
 
     public String getId() { return id; }
@@ -55,6 +60,9 @@ public class Farmer {
 
     public String getPasswordHash() { return passwordHash; }
     public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
+
+    public String getRole() { return role == null || role.isBlank() ? "FARMER" : role; }
+    public void setRole(String role) { this.role = role; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

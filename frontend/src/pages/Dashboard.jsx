@@ -61,14 +61,14 @@ export default function Dashboard({ farmer, setPage }) {
     <>
       <div className="page-head">
         <div>
-          <p className="eyebrow">FARMER COMMAND CENTER</p>
+          <p className="eyebrow">YOUR FARM TODAY</p>
 
           <h1>
             Good day, {farmer.name?.split(' ')[0] || 'Farmer'}.
           </h1>
 
           <p className="muted">
-            Here's the latest picture of your farm activity.
+            Here is how your farm is doing.
           </p>
         </div>
 
@@ -77,7 +77,7 @@ export default function Dashboard({ farmer, setPage }) {
             className="secondary"
             onClick={() => setPage('ai')}
           >
-            View AI insights
+            See my buying tips
           </button>
 
           <button
@@ -100,7 +100,7 @@ export default function Dashboard({ farmer, setPage }) {
         <StatCard
           label="Total income"
           value={loading ? 'Loading...' : money(income)}
-          sub="Recorded sales"
+          sub="Sales you added"
           icon="arrow"
           positive
         />
@@ -108,7 +108,7 @@ export default function Dashboard({ farmer, setPage }) {
         <StatCard
           label="Total expenses"
           value={loading ? 'Loading...' : money(expenses)}
-          sub="Recorded costs"
+          sub="Costs you added"
           icon="wallet"
         />
 
@@ -141,7 +141,7 @@ export default function Dashboard({ farmer, setPage }) {
             </div>
 
             <span className="tag">
-              {loading ? 'LOADING' : 'LIVE DATA'}
+              {loading ? 'LOADING' : 'UP TO DATE'}
             </span>
           </div>
 
@@ -152,7 +152,7 @@ export default function Dashboard({ farmer, setPage }) {
             </div>
 
             <div>
-              <b>AI-powered buying opportunities</b>
+              <b>Save money by buying together</b>
 
               <p>
                 Explore open orders and compare listed prices.
@@ -162,7 +162,7 @@ export default function Dashboard({ farmer, setPage }) {
             </div>
 
             <button onClick={() => setPage('ai')}>
-              Explore →
+              See my tips →
             </button>
 
           </div>
@@ -193,8 +193,8 @@ export default function Dashboard({ farmer, setPage }) {
 
           <div className="panel-head">
             <div>
-              <p className="eyebrow">RECENT INTELLIGENCE</p>
-              <h2>Recommendations</h2>
+              <p className="eyebrow">JUST FOR YOU</p>
+              <h2>Buying tips</h2>
             </div>
 
             <button
@@ -210,10 +210,9 @@ export default function Dashboard({ farmer, setPage }) {
               <div className="list-row">
                 <span className="round-icon">✦</span>
                 <div>
-                  <b>Analysing farm activity...</b>
+                  <b>Looking at your spending...</b>
                   <p>
-                    Checking purchasing patterns and available
-                    opportunities.
+                    Finding products that could cost you less.
                   </p>
                 </div>
               </div>
@@ -221,9 +220,9 @@ export default function Dashboard({ farmer, setPage }) {
               <div className="list-row">
                 <span className="round-icon">✦</span>
                 <div>
-                  <b>Preparing recommendations...</b>
+                  <b>Getting your tips ready...</b>
                   <p>
-                    Your latest activity is being processed.
+                    This only takes a moment.
                   </p>
                 </div>
               </div>
@@ -245,7 +244,7 @@ export default function Dashboard({ farmer, setPage }) {
 
                   <p>
                     {recommendation.reason ||
-                      'Potential group purchasing opportunity detected.'}
+                      'You could save by joining a group order for this product.'}
                   </p>
                 </div>
               </div>
@@ -257,7 +256,7 @@ export default function Dashboard({ farmer, setPage }) {
               <span>✦</span>
 
               <b>
-                No recommendations yet
+                No buying tips yet
               </b>
 
               <p>
@@ -268,7 +267,7 @@ export default function Dashboard({ farmer, setPage }) {
                 className="secondary"
                 onClick={() => setPage('ai')}
               >
-                Open AI Insights
+                Open Buying Tips
               </button>
 
             </div>
@@ -305,7 +304,7 @@ export default function Dashboard({ farmer, setPage }) {
         {loading ? (
           <div className="empty">
             <span>◌</span>
-            <b>Loading group opportunities...</b>
+            <b>Loading group orders...</b>
           </div>
         ) : groups.length === 0 ? (
           <div className="empty">
@@ -316,8 +315,7 @@ export default function Dashboard({ farmer, setPage }) {
             </b>
 
             <p>
-              New collective purchasing opportunities will appear
-              here when farmers create group orders.
+              When a farmer starts a group order, it will show up here so you can join.
             </p>
 
             <button

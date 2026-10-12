@@ -5,6 +5,18 @@ const API = import.meta.env.VITE_API_URL || '/api';
 export const TOKEN_KEY = 'agritech_token';
 export const FARMER_KEY = 'agritech_farmer';
 
+// Plain-language message for when the server gives no specific reason.
+function friendlyStatus(status) {
+  if (status === 400 || status === 422) return 'Something in that form is not right. Please check it and try again.';
+  if (status === 403) return 'You are not allowed to do that.';
+  if (status === 404) return 'We could not find what you were looking for.';
+  if (status === 409) return 'That already exists.';
+  if (status === 413) return 'That file is too big. Please choose a smaller one.';
+  if (status === 429) return 'Too many tries. Please wait a moment and try again.';
+  if (status >= 500) return 'Something went wrong on our side. Please try again in a moment.';
+  return 'Something went wrong. Please try again.';
+}
+
 export async function api(path, options = {}) {
   const token = localStorage.getItem(TOKEN_KEY);
   let res;
@@ -18,7 +30,7 @@ export async function api(path, options = {}) {
       }
     });
   } catch {
-    throw new Error('Cannot reach the server. Is the backend running on port 8080?');
+    throw new Error('We could not connect. Please check your internet connection and try again.');
   }
 
   const text = await res.text();
@@ -142,4 +154,17 @@ export const avatarApi = {
     const r = await fetch(`${API}/farmers/${encodeURIComponent(id)}/avatar`, { method: 'DELETE', headers: authHeader() });
     if (!r.ok) throw new Error(await failMessage(r, `Could not remove photo (${r.status})`));
   }
+};
+
+export const farmMarketApi = {
+  search: (params = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== '' && v != null) qs.set(k, v); });
+    const s = qs.toString();
+    return api(`/market/listings${s ? `?${s}` : ''}`);
+  },
+  mine: () => api('/market/listings/mine'),
+  create: (body) => api('/market/listings', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id, body) => api(`/market/listings/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  remove: (id) => api(`/market/listings/${id}`, { method: 'DELETE' })
 };

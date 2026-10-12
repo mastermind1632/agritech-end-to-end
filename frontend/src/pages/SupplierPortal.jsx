@@ -47,7 +47,7 @@ export default function SupplierPortal() {
   const saveSupplier = (e) => {
     e.preventDefault();
     run(async () => {
-      if (supplierModal === 'new') { const created = await marketApi.createSupplier(sForm); await loadSuppliers(created.id); note('Supplier saved to the database.'); }
+      if (supplierModal === 'new') { const created = await marketApi.createSupplier(sForm); await loadSuppliers(created.id); note('Supplier added.'); }
       else { await marketApi.updateSupplier(selected, sForm); await loadSuppliers(selected); note('Supplier updated.'); }
     }, () => setSupplierModal(null));
   };
@@ -64,7 +64,7 @@ export default function SupplierPortal() {
     const body = { productName: pForm.productName, price: Number(pForm.price), comparisonKey: pForm.comparisonKey,
       packSize: pForm.packSize === '' ? null : Number(pForm.packSize), packUnit: pForm.packUnit };
     run(async () => {
-      if (productModal === 'new') { await marketApi.addProduct(selected, body); note('Product saved to the database.'); }
+      if (productModal === 'new') { await marketApi.addProduct(selected, body); note('Product added.'); }
       else { await marketApi.updateProduct(productModal.id, body); note('Product updated.'); }
       await refresh();
     }, () => setProductModal(null));
@@ -78,7 +78,7 @@ export default function SupplierPortal() {
   return (
     <>
       <div className="page-head">
-        <div><p className="eyebrow">SUPPLIER WORKSPACE</p><h1>Supplier portal</h1><p className="muted">Add suppliers and products here. Everything is saved to PostgreSQL through the API and shows up in the Marketplace and Group Orders.</p></div>
+        <div><p className="eyebrow">FOR SUPPLIERS</p><h1>Supplier portal</h1><p className="muted">List the suppliers and products you sell here. Farmers will see them in the Supplier Shop and can buy them together through Group Orders.</p></div>
         <div className="head-actions">
           {suppliers.length > 0 && <select className="filter" value={selected} onChange={(e) => setSelected(e.target.value)}>{suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>}
           <button className="primary" onClick={openNewSupplier}>+ Add supplier</button>

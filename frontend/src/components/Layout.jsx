@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import Icon from './Icon';
 import Avatar from './Avatar';
 const nav=[['dashboard','Overview','grid'],['finance','My Finances','wallet'],['market','Marketplace','market'],['intelligence','Produce Markets','market'],['groups','Group Orders','users'],['ai','AI Insights','spark'],['notifications','Notifications','bell'],['chat','Chat','chat'],['supplier','Supplier Portal','market']];

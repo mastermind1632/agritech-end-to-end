@@ -50,6 +50,8 @@ public class SecurityConfig {
                 // /api/group-orders/{id}/items (which lists farmer ids) still needs a login.
                 .requestMatchers(HttpMethod.GET, "/api/suppliers", "/api/suppliers/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/group-orders", "/api/group-orders/*").permitAll()
+                // Product photos are public so a plain <img> tag can load them (it cannot send a login header).
+                .requestMatchers(HttpMethod.GET, "/api/market/images/*").permitAll()
                 .anyRequest().authenticated())
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();

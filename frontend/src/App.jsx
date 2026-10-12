@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Finance from './pages/Finance';
 import Marketplace from './pages/Marketplace';
+import FarmMarket from './pages/FarmMarket';
 import Groups from './pages/Groups';
 import AI from './pages/AI';
 import Notifications from './pages/Notifications';
