@@ -1,0 +1,36 @@
+name: Production Capacity Inspection
+
+on:
+  push:
+    branches: [ops/server-capacity]
+    paths: [.github/workflows/server-capacity.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect production without changing services or data
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 5m
+          script: |
+            set -eu
+            date -u
+            uname -m
+            df -h /
+            df -i /
+            free -h
+            docker system df
+            docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Ports}}'
+            docker image ls --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}' | head -70
+            ss -lnt | grep -E ':(80|443|8080)\b' || true
+            if sudo -n true 2>/dev/null; then
+              sudo iptables -S INPUT
+            fi
