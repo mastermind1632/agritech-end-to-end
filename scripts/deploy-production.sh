@@ -42,6 +42,26 @@ fi
 compose pull
 compose up -d --no-build --wait --wait-timeout 900
 
+compose exec -T segmentation-service python - <<'PY'
+import json
+import time
+from urllib.error import URLError
+from urllib.request import urlopen
+
+# Compose only checks process state for Spring, which has no container healthcheck.
+for attempt in range(120):
+    try:
+        with urlopen('http://spring-app:8080/actuator/health', timeout=5) as response:
+            if json.load(response).get('status') == 'UP':
+                print('Spring backend readiness confirmed.')
+                break
+    except (URLError, TimeoutError, OSError, ValueError):
+        pass
+    time.sleep(2)
+else:
+    raise RuntimeError('Spring backend did not become ready before authenticated release checks')
+PY
+
 compose exec -T segmentation-service python /app/app/production_smoke.py
 compose exec -T langchain-service python - <<'PY'
 import json
