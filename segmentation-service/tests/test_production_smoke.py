@@ -56,8 +56,9 @@ class ProductionSmokeTest(unittest.TestCase):
                 question = body['prompt']
                 if question == 'How do i water plants':
                     return Response({'route': 'farming', 'response': 'Check soil moisture and water the roots.', 'sources': [{'id': 'guide:water'}]})
-                if question == 'What is my recorded profit?':
-                    return Response({'route': 'finance', 'response': 'Recorded profit R0.00'})
+                if question in ('What is my recorded profit?', 'what is my recorded profits'):
+                    return Response({'route': 'finance', 'response': 'Recorded profit R0.00',
+                                     'sources': [{'id': 'guide:ledger'}]})
                 if question == 'Find buyers for my produce':
                     return Response({'route': 'produce', 'response': 'Your farm group: Small tomato growers'})
                 if question == 'Show my buying opportunities':

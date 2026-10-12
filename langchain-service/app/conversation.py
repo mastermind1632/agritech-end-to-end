@@ -3,6 +3,8 @@ from decimal import Decimal, InvalidOperation
 import json
 import re
 
+FINANCE_TERMS = r"\b(profits?|incomes?|expenses?|ledgers?|budgets?|earnings|revenues?)\b"
+
 
 def normalise(question):
     return re.sub(r"\bseeda\b", "seeds", question.lower()).strip().rstrip("?.!")
@@ -18,12 +20,13 @@ def followup(question, messages=()):
     last = messages[-1]["text"].lower() if messages and messages[-1]["role"] == "assistant" else ""
     return bool(last.endswith('?') and re.search(r"which (crop|town)|your farm near", last)
                 and len(text.split()) <= 6 and '?' not in question
-                and not re.search(r"\b(how|what|where|why|when|water\w*|irrigation|soil|weather|expenses?|income|profit|fertilis\w*|fertiliz\w*|seeds?)\b", text))
+                and not re.search(FINANCE_TERMS, text)
+                and not re.search(r"\b(how|what|where|why|when|water\w*|irrigation|soil|weather|fertilis\w*|fertiliz\w*|seeds?)\b", text))
 
 
 def route_for(question, previous_route=None, messages=()):
     text = normalise(question)
-    if re.search(r"\b(profit|income|expenses?|ledger|budget)\b", text):
+    if re.search(FINANCE_TERMS, text):
         return "finance"
     if re.search(r'\b(buyers?|sell|selling)\b|produce markets', text):
         return 'produce'
@@ -44,7 +47,7 @@ def seed_shopping(question, messages):
         return True
     if followup(question, messages):
         for user in reversed(users):
-            if re.search(r"\b(seeds?|fertilis\w*|fertiliz\w*|water\w*|expenses?|income)\b", user):
+            if re.search(FINANCE_TERMS, user) or re.search(r"\b(seeds?|fertilis\w*|fertiliz\w*|water\w*)\b", user):
                 return bool(re.search(r"\bseeds?\b", user))
     return False
 

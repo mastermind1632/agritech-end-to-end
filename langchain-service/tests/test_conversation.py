@@ -5,6 +5,14 @@ from app.conversation import catalogue_reply, followup, route_for
 
 
 class ConversationTests(unittest.TestCase):
+    def test_financial_variations_override_previous_topics(self):
+        history = [{'role': 'assistant', 'text': 'Which crop do you grow?'}]
+        for question in ('what is my recorded profits', 'My profits', 'My income',
+                         'My incomes', 'My earnings', 'My revenue', 'My expenses', 'My budgets'):
+            self.assertFalse(followup(question, history), question)
+            for previous in ('farming', 'produce', 'buying'):
+                self.assertEqual(route_for(question, previous, history), 'finance', question)
+
     def test_seed_shopping_and_typo_route_to_catalogue(self):
         for question in ('Where can i get seeds', 'Where can i get seeda', 'Crops seeds', 'seeds', 'Buy maize seeds'):
             self.assertEqual(route_for(question), 'buying', question)

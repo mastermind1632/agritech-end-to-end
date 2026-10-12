@@ -83,9 +83,13 @@ def main():
         for question, route, fragment in (
                 ('What is my recorded profit?', 'finance', 'R0.00'),
                 ('Find buyers for my produce', 'produce', 'Your farm group'),
+                ('what is my recorded profits', 'finance', 'R0.00'),
                 ('Show my buying opportunities', 'buying', opportunities[0]['productName'] if opportunities else 'No available')):
             reply = call(f'/ai/conversations/{conversation}/turn', 'POST', {'prompt': question}, farmer['token'])
             assert reply['route'] == route and fragment in reply['response'], f'{route} chat advice was not grounded'
+            if route == 'finance':
+                assert 'water' not in reply['response'].lower(), 'Previous topic contaminated financial advice'
+                assert all(s['id'] in ('guide:ledger', 'guide:fertiliser', 'guide:buying') for s in reply['sources'])
         if opportunities:
             order = opportunities[0]
             quote = call('/recommendations/' + order['id'] + '/quote?quantity=1', token=farmer['token'])

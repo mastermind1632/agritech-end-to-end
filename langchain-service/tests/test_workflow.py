@@ -99,6 +99,27 @@ class WorkflowTests(unittest.TestCase):
         self.assertFalse(any(m.type == 'ai' for m in self.model.seen))
         self.assertIn('LATEST QUESTION', self.model.seen[-1].content)
 
+    def test_recorded_profits_after_watering_and_buyers_uses_own_ledger(self):
+        self.model.answer = 'Check soil moisture and water around roots.'
+        self.ask('How do I water plants?')
+        self.backend.produce_matches = lambda bearer: {'profileMissing': True}
+        self.ask('Find buyers for my produce')
+        self.backend.retrieve = Mock(return_value={
+            'sources': [{'id': 'guide:ledger', 'title': 'Farm ledger', 'content': 'Recorded income and expenses.'},
+                        {'id': 'guide:water', 'title': 'Water', 'content': 'Water around roots.'}],
+            'context': 'Authenticated own ledger', 'system': 'Agriculture only.',
+            'ledger': {'income': 100, 'expenses': 20, 'profit': 80}})
+        self.model.seen.clear()
+        result = self.ask('what is my recorded profits')
+        self.assertEqual(result['route'], 'finance')
+        self.assertIn('R100.00', result['response'])
+        self.assertIn('R20.00', result['response'])
+        self.assertIn('R80.00', result['response'])
+        self.assertNotIn('water', result['response'].lower())
+        self.assertEqual([s['id'] for s in result['sources']], ['guide:ledger'])
+        self.assertEqual(self.model.seen, [])
+        self.assertEqual(self.backend.retrieve.call_args.args[0], 'what is my recorded profits')
+
     def test_internal_instructions_are_removed_from_reply_and_saved_history(self):
         self.model.answer = 'Check soil moisture. Ask about the crop, soil and location; do not invent rainfall.'
         result = self.ask('How do I water plants?')
