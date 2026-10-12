@@ -23,11 +23,15 @@ rollback() {
     set +e
     echo 'Release failed; restoring the previous application configuration. Database volumes are unchanged.'
     compose stop segmentation-service segmentation-worker
-    for file in .env docker-compose.prod.yml docker-compose.ai.yml docker-compose.https.yml; do
+    for file in .env docker-compose.prod.yml docker-compose.ai.yml docker-compose.segmentation.yml docker-compose.https.yml; do
         if [ -f "$backup/$file" ]; then cp -p "$backup/$file" "$file"; fi
     done
-    docker compose --env-file .env -f docker-compose.prod.yml -f docker-compose.ai.yml \
-        up -d --no-build --wait --wait-timeout 300
+    if [ -f "$backup/docker-compose.segmentation.yml" ]; then
+        compose up -d --no-build --wait --wait-timeout 300
+    else
+        docker compose --env-file .env -f docker-compose.prod.yml -f docker-compose.ai.yml \
+            up -d --no-build --wait --wait-timeout 300
+    fi
     exit "$result"
 }
 trap rollback EXIT

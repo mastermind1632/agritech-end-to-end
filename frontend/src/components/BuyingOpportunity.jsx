@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { recommendationApi } from '../lib/api';
 
 const rand = value => {
@@ -13,6 +13,7 @@ export default function BuyingOpportunity({ item, reviewOrder, requestReview, re
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const sequence = useRef(0);
+  useEffect(() => { sequence.current++; setOpportunity(item); setQuantity(item.quote.quantity); setError(''); }, [item]);
   const quote = opportunity.quote;
   const changed = Number(quantity) !== quote.quantity;
   const check = async event => {
@@ -27,6 +28,7 @@ export default function BuyingOpportunity({ item, reviewOrder, requestReview, re
   };
   return <article className="buying-opportunity">
     <h3>{opportunity.productName}</h3>
+    <span className="tag">{opportunity.matchedItems?.length ? 'PURCHASE MATCH' : 'OPEN ORDER'}</span>
     <p>{opportunity.reason}</p>
     <form className="buying-quantity" onSubmit={check}>
       <label>Quantity<input type="number" min="1" max={opportunity.remainingQuantity} step="1"
@@ -52,7 +54,7 @@ export default function BuyingOpportunity({ item, reviewOrder, requestReview, re
     {!opportunity.equivalentPrices?.length && <p className="muted">No pack specifications available for comparisons across listings.</p>}
     <small>Prices checked: {new Date(quote.checkedAt).toLocaleString()}</small>
     {error && <p className="farm-error" role="alert">{error}</p>}
-    <button className="text-button" onClick={() => reviewOrder(opportunity.suggestedGroupOrderId)}>Review this order</button>
+    <button className="text-button" disabled={busy || changed || !!error} onClick={() => reviewOrder(opportunity.suggestedGroupOrderId, quote.quantity)}>Review this order</button>
     <button className="secondary" disabled={reviewDisabled || busy || changed || !!error}
       onClick={() => requestReview({ orderId: opportunity.suggestedGroupOrderId, quantity: quote.quantity })}>
       Request assistant review</button>

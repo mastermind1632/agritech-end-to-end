@@ -16,7 +16,8 @@ public class FarmKnowledgeService {
             new Snippet("guide:buying", "Suppliers and group buying", "Marketplace lists product names and listed prices. Group Orders pools orders for supplier products. An open order has a target quantity, current quantity and discount rate. Check product, quantity, delivery and final price before joining. Do not invent stock, delivery dates or discounts, or claim an order has been placed."),
             new Snippet("guide:water", "Water and irrigation", "Check soil moisture before watering. Apply water to the soil around the roots and allow it to soak in rather than pooling. Avoid keeping the soil waterlogged. Check irrigation leaks. Exact amounts and schedules depend on crop, growth stage, soil, rainfall, location and available water; there is no universal watering schedule."),
             new Snippet("guide:rotation", "Crop rotation", "Crop rotation alternates crop families across seasons. It can help manage soil fertility and pest pressure. Ask about the previous crop, next crop, location and water before suggesting a rotation. No guaranteed yield or profit can be inferred from rotation alone."),
-            new Snippet("guide:analytics", "Farmer clusters, nearest matches and anomalies", "K-means clustering groups farmers by spending, orders and product behaviour. Nearest matching finds similar farmer profiles; similarity is not a credit score or proof of eligibility. Anomalies flag unusual spending or order signals for review, not confirmed fraud. Ask the farmer to check the actual analytics results; do not invent cluster membership or private farmer records."));
+            new Snippet("guide:analytics", "Farmer clusters, nearest matches and anomalies", "K-means clustering groups farmers by spending, orders and product behaviour. Nearest matching finds similar farmer profiles; similarity is not a credit score or proof of eligibility. Anomalies flag unusual spending or order signals for review, not confirmed fraud. Actual analytics results are needed to establish cluster membership."),
+            new Snippet("guide:produce", "Produce markets and buyers", "Produce Markets matches recorded buyer requests to the farmer's production profile using crop, harvest month, delivery radius and capacity. Production profiles contain farm size, crop, province, district, private coordinates, planting and harvest months, capacity and consent settings. No matching request means no buyer opportunity is currently recorded. Listings and Demand insights show recorded produce supply and demand, not confirmed sales. Marketplace and Group Orders cover farm inputs such as seeds, not harvest buyer requests."));
 
     // PostgreSQL full-text search supplies stemming and stop-word removal, including seed/seeds.
     private static final String SEARCH = """
@@ -60,7 +61,8 @@ public class FarmKnowledgeService {
     static ChatResponse.Source citation(Snippet snippet) {
         if (!snippet.id().startsWith("source:"))
             return new ChatResponse.Source(snippet.id(), snippet.title(), null, "AgriTech",
-                    "South Africa / AgriTech app", null, "Internal app guidance or live catalogue");
+                    "South Africa / AgriTech app", null, snippet.id().startsWith("product:")
+                            ? "Live catalogue listing; stock unverified" : "AgriTech app guidance");
         String id = snippet.id().substring(7);
         return new ChatResponse.Source(snippet.id(), snippet.title(), EXTERNAL.getProperty(id + ".url"),
                 EXTERNAL.getProperty(id + ".publisher"), EXTERNAL.getProperty(id + ".region"),

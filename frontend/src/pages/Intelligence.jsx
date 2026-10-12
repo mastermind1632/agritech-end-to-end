@@ -32,12 +32,15 @@ export default function Intelligence({ setPage }) {
   useEffect(() => {
     let active = true;
     setLoading(true); setError(''); setNeedsProfile(false);
-    const request = tab === 'matches' ? intelligenceApi.recommendations() : tab === 'demand' ? intelligenceApi.demand() : Promise.all(['offer', 'demand'].map(kind => intelligenceApi.records({ mine: true, kind })));
+    const request = tab === 'matches' ? intelligenceApi.recommendations() : tab === 'demand' ? intelligenceApi.demand() : Promise.all([
+      ...['offer', 'demand'].map(kind => intelligenceApi.records({ mine: true, kind })),
+      intelligenceApi.records(Object.fromEntries(Object.entries(filter).filter(([, v]) => v !== '')))
+    ]);
     request.then(result => {
       if (!active) return;
       if (tab === 'matches') setRecommendations(result);
       else if (tab === 'demand') setInsights(result);
-      else setMine(result.flatMap(r => r.records));
+      else { setMine(result.slice(0, 2).flatMap(r => r.records)); setRows(result[2].records); }
     }).catch(e => { if (active) { setError(e.message); setNeedsProfile(e.status === 409); } }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [tab]);
@@ -82,11 +85,11 @@ export default function Intelligence({ setPage }) {
         <div className="mi-segment"><span className="tag">{recommendations.segment.method === 'rules' ? 'RULE-BASED SEGMENT' : 'ML SEGMENT'}</span><h2>{recommendations.segment.name}</h2><p className="muted">{recommendations.segment.reviewStatus}</p></div>
         <h2>Buyer matches</h2>{recommendations.recommendations.length ? recommendations.recommendations.map(r => record(r)) : <p className="mi-empty">No buyer requests match your crop, harvest month, delivery radius and capacity yet.</p>}
         <p className="muted">{recommendations.notice}</p>
-        {recommendations.services.length > 0 && <><h2>Service opportunities</h2><ul className="mi-services">{recommendations.services.map(s => <li key={s.service}><strong>{s.service.replaceAll('_', ' ')}</strong><p>{s.reason}</p></li>)}</ul></>}
+        {recommendations.services.length > 0 && <><h2>Service opportunities</h2><ul className="mi-services">{recommendations.services.map(s => <li key={s.service}><strong>{({ business_companion: 'Business registration support', export_readiness: 'Export readiness', expense_insights: 'Expense insights' })[s.service] || s.service.replaceAll('_', ' ')}</strong><p>{s.reason}</p></li>)}</ul></>}
       </>}
       {tab === 'market' && options && <>
         <form className="mi-search" onSubmit={search}><label>Listing type<select value={filter.kind} onChange={e => setFilter({ ...filter, kind: e.target.value })}><option value="offer">Produce offers</option><option value="demand">Buyer requests</option></select></label><label>Crop<select value={filter.crop} onChange={e => setFilter({ ...filter, crop: e.target.value })}><option value="">All crops</option>{options.crops.map(c => <option key={c}>{c}</option>)}</select></label><label>Province<select value={filter.province} onChange={e => setFilter({ ...filter, province: e.target.value })}><option value="">All provinces</option>{options.provinces.map(p => <option key={p}>{p}</option>)}</select></label><button className="primary" disabled={busy}>Search</button></form>
-        <div>{rows.map(r => record(r))}</div>
+        <div>{rows.length ? rows.map(r => record(r)) : !loading && <p className="mi-empty">No recorded listings match these filters.</p>}</div>
         <h2>Publish a listing</h2>
         <form className="production-form" onSubmit={publish}>
           <label>Listing type<select value={form.kind} onChange={e => setForm({ ...form, kind: e.target.value })}><option value="offer">Produce offer</option><option value="demand">Buyer request</option></select></label>

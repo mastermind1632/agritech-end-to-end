@@ -1,7 +1,7 @@
 """Exercise authenticated production contracts; remove only this run's synthetic accounts."""
 import json
 import secrets
-from datetime import date, timedelta
+from datetime import date
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 from uuid import uuid4
@@ -42,21 +42,26 @@ def main():
                    'consistentProduction': False, 'analyticsConsent': False, 'expenseConsent': False}
         call('/market-intelligence/profile', 'PUT', profile, farmer['token'])
         call('/market-intelligence/profile', 'PUT', {**profile, 'ownerId': buyer['farmer']['id']}, farmer['token'], 422)
-        listing = call('/market-intelligence/records', 'POST', {'kind': 'demand', 'crop': 'tomato',
-                       'province': 'Limpopo', 'district': 'Capricorn', 'latitude': -23.91, 'longitude': 29.46,
-                       'quantityKg': 500, 'pricePerKg': 10, 'availableFrom': date.today().isoformat(),
-                       'availableUntil': (date.today() + timedelta(days=2)).isoformat(),
-                       'displayName': 'Synthetic release verification; removed immediately', 'publicContact': ''}, buyer['token'])
         matches = call('/market-intelligence/recommendations', token=farmer['token'])
-        assert any(row['id'] == listing['id'] for row in matches['recommendations'])
         assert matches['impressionId'] is None
         for row in matches['recommendations']:
             assert 'ownerId' not in row and 'latitude' not in row and 'longitude' not in row
-        call('/market-intelligence/records/' + listing['id'], 'DELETE', token=farmer['token'], expected=404)
-        call('/market-intelligence/records/' + listing['id'], 'DELETE', token=buyer['token'])
+        for kind in ('offer', 'demand'):
+            existing = call('/market-intelligence/records?kind=' + kind, token=farmer['token'])
+            for row in existing['records']:
+                assert 'ownerId' not in row and 'latitude' not in row and 'longitude' not in row
         call('/market-intelligence/profile', expected=401)
         call('/market-intelligence/options', token=farmer['token'])
-        call('/market-intelligence/demand', token=farmer['token'])
+        demand = call('/market-intelligence/demand', token=farmer['token'])
+        assert isinstance(demand['rows'], list) and isinstance(demand['forecasts'], list)
+        for path in ('/ai/farmer-clusters', '/ai/farmers/' + farmer['farmer']['id'] + '/nearest',
+                     '/ai/farmers/' + farmer['farmer']['id'] + '/anomalies'):
+            assert call(path, token=farmer['token']) is not None
+        opportunities = call('/recommendations/farmer/' + farmer['farmer']['id'], token=farmer['token'])
+        assert isinstance(opportunities, list)
+        print(f'Existing-data checks passed: {len(opportunities)} group-buying opportunities, '
+              f'{len(matches["recommendations"])} qualified buyer matches, {len(demand["rows"])} demand rows. '
+              'No public listings or orders were created or modified.')
         print('Production identity, profile, matching, privacy, ownership and consent contracts passed.')
         conversation = call('/ai/conversations', 'POST', {}, farmer['token'])['conversationId']
         conversations.append((conversation, farmer['token']))
@@ -73,6 +78,25 @@ def main():
         assert water['route'] == 'farming'
         assert any(word in water['response'].lower() for word in ('soil', 'root', 'moisture')), 'General watering guidance missing'
         assert 'seed' not in water['response'].lower(), 'Previous seed topic contaminated a new watering question'
+        assert 'ask about' not in water['response'].lower() and 'do not invent' not in water['response'].lower()
+        assert all(s['id'] in ('guide:water', 'source:fao-water') for s in water['sources'])
+        for question, route, fragment in (
+                ('What is my recorded profit?', 'finance', 'R0.00'),
+                ('Find buyers for my produce', 'produce', 'Your farm group'),
+                ('Show my buying opportunities', 'buying', opportunities[0]['productName'] if opportunities else 'No available')):
+            reply = call(f'/ai/conversations/{conversation}/turn', 'POST', {'prompt': question}, farmer['token'])
+            assert reply['route'] == route and fragment in reply['response'], f'{route} chat advice was not grounded'
+        if opportunities:
+            order = opportunities[0]
+            quote = call('/recommendations/' + order['id'] + '/quote?quantity=1', token=farmer['token'])
+            assert quote['quote']['supplierDiscountConfirmed'] is False
+            approval = call(f'/ai/conversations/{conversation}/turn', 'POST',
+                            {'prompt': 'Review this group order', 'action': {'orderId': order['id'], 'quantity': 1}}, farmer['token'])
+            assert approval['approval'] and approval['actionReady'] is None
+            cancelled = call(f'/ai/conversations/{conversation}/resume', 'POST',
+                             {'interruptId': approval['approval']['interruptId'], 'approved': False}, farmer['token'])
+            assert cancelled['approval'] is None and cancelled['actionReady'] is None
+        print('Analytics, cold-start buying, current ledger advice, produce buyer advice and non-purchasing order review passed.')
         print('Reported seed conversation, location clarification and real generated watering advice passed.')
     finally:
         try:

@@ -155,9 +155,9 @@ export default function Dashboard({ farmer, setPage }) {
               <b>AI-powered buying opportunities</b>
 
               <p>
-                Your recorded activity can reveal products that
-                may be cheaper when purchased together with nearby
-                farmers.
+                Explore open orders and compare listed prices.
+                Purchase matches use your recorded activity;
+                supplier terms still need confirmation.
               </p>
             </div>
 
@@ -241,7 +241,7 @@ export default function Dashboard({ farmer, setPage }) {
                 </span>
 
                 <div>
-                  <b>Buying opportunity</b>
+                  <b>{recommendation.productName || 'Buying opportunity'}</b>
 
                   <p>
                     {recommendation.reason ||
@@ -261,8 +261,7 @@ export default function Dashboard({ farmer, setPage }) {
               </b>
 
               <p>
-                Record some farm activity and generate AI insights
-                to discover potential savings.
+                No available group-buying opportunities right now.
               </p>
 
               <button
@@ -352,6 +351,7 @@ export default function Dashboard({ farmer, setPage }) {
                     <td>
                       <b>
                         {group.productName ||
+                          recommendations.find(r => r.suggestedGroupOrderId === group.id)?.productName ||
                           group.product ||
                           'Group order'}
                       </b>

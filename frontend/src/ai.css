@@ -39,6 +39,9 @@
 .buying-opportunity small { display: block; color: #52635d; }
 .farm-sources { padding-left: 18px; font-size: 13px; }
 .farm-sources small { display: block; }
+.farm-source-details { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+.farm-source-details summary { cursor: pointer; color: #52635d; font-size: 13px; }
+.farm-sources li { padding: 6px 0; line-height: 1.5; }
 @media (max-width: 600px) { .buying-prices { grid-template-columns: 1fr; } .buying-opportunity { padding: 16px; } }
 .buying-alternatives ul { padding: 0; list-style: none; }
 .buying-alternatives li { display: flex; gap: 12px; justify-content: space-between; flex-wrap: wrap; padding: 12px 0; border-bottom: 1px solid #dbe5df; }

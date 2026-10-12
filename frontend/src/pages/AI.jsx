@@ -12,6 +12,7 @@ export default function AI({ farmer, setPage, reviewOrder }) {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [opportunityError, setOpportunityError] = useState('');
   const [chatError, setChatError] = useState('');
   const [insights, setInsights] = useState(null);
   const [conversationId, setConversationId] = useState(null);
@@ -22,14 +23,21 @@ export default function AI({ farmer, setPage, reviewOrder }) {
   const activeFarmer = useRef(farmer.id);
   const load = async () => {
     const current = ++session.current;
-    setLoading(true); setError(''); setInsights(null);
+    setLoading(true); setError(''); setOpportunityError(''); setInsights(null); setItems([]);
     try {
-      const [group, similar, alerts, recommendations] = await Promise.all([
+      const results = await Promise.allSettled([
         assistantApi.buyingGroup(), assistantApi.similar(farmer.id),
         assistantApi.alerts(farmer.id), recommendationApi.list(farmer.id)
       ]);
       if (current !== session.current) return;
-      setInsights({ group, similar, alerts }); setItems(recommendations || []);
+      const [group, similar, alerts, recommendations] = results;
+      if (recommendations.status === 'fulfilled') setItems(recommendations.value || []);
+      else setOpportunityError(recommendations.reason.message);
+      if ([group, similar, alerts].every(r => r.status === 'fulfilled')) {
+        setInsights({ group: group.value, similar: similar.value, alerts: alerts.value });
+      }
+      const failures = [group, similar, alerts].filter(r => r.status === 'rejected');
+      if (failures.length) setError(failures.map(r => r.reason.message).join(' '));
     } catch (e) { if (current === session.current) setError(e.message); }
     finally { if (current === session.current) setLoading(false); }
   };
@@ -121,11 +129,11 @@ export default function AI({ farmer, setPage, reviewOrder }) {
   };
   const generate = async () => {
     const id = farmer.id;
-    setRefreshing(true); setError('');
+    setRefreshing(true); setOpportunityError('');
     try {
       const recommendations = await recommendationApi.generate(id);
       if (activeFarmer.current === id) setItems(recommendations || []);
-    } catch (e) { if (activeFarmer.current === id) setError(e.message); }
+    } catch (e) { if (activeFarmer.current === id) setOpportunityError(e.message); }
     finally { setRefreshing(false); }
   };
   return <>
@@ -138,12 +146,12 @@ export default function AI({ farmer, setPage, reviewOrder }) {
         {messages.length === 0 && !approval && !starting && <p className="muted">What would you like to ask about seeds, farm costs or group buying?</p>}
         {messages.map((message, index) => <article className={`farm-message ${message.role}`} key={index}>
           <strong>{message.role === 'user' ? 'You' : 'Farm assistant'}</strong><p>{message.text}</p>
-          {!!message.sources?.length && <ul className="farm-sources">{message.sources.map(source => <li key={source.id}>
+          {!!message.sources?.length && <details className="farm-source-details"><summary>Sources ({message.sources.length})</summary><ul className="farm-sources">{message.sources.map(source => <li key={source.id}>
             {source.url?.startsWith('https://') ? <a href={source.url} target="_blank" rel="noreferrer">{source.title}</a> : source.title}
             {source.region && <small>{source.region}</small>}
             {source.checkedOn && <small>Source checked: {source.checkedOn}</small>}
             {source.reviewStatus && <small>{source.reviewStatus}</small>}
-          </li>)}</ul>}
+          </li>)}</ul></details>}
         </article>)}
         {sending && <p role="status">Thinking...</p>}
         {starting && <p role="status">Loading your conversation...</p>}
@@ -187,10 +195,11 @@ export default function AI({ farmer, setPage, reviewOrder }) {
     </section>
     <section className="farm-insights">
       <div className="farm-section-head"><h2>Group-buying opportunities</h2><button className="primary" onClick={generate} disabled={refreshing}>{refreshing ? 'Checking...' : 'Find opportunities'}</button></div>
+      {opportunityError && <p className="farm-error" role="alert">{opportunityError}</p>}
       {items.length ? <div className="buying-opportunities">{items.map(item =>
         <BuyingOpportunity key={item.id} item={item} reviewOrder={reviewOrder} requestReview={requestReview}
           reviewDisabled={sending || starting || !conversationId || !!approval} />)}</div>
-        : <p className="muted">No open orders match your recorded purchases. Add your farm expenses to find relevant opportunities.</p>}
+        : !opportunityError && <p className="muted">{loading ? 'Loading buying opportunities...' : 'No available group-buying opportunities right now.'} {!loading && <button className="text-button" onClick={() => setPage('groups')}>Browse group orders</button>}</p>}
     </section>
   </>;
 }

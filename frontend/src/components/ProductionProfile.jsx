@@ -70,7 +70,7 @@ export default function ProductionProfile({ onSaved }) {
         <label><input type="checkbox" name="analyticsConsent" checked={form.analyticsConsent} onChange={change} /> I consent to my production profile and activity being used for shared segmentation and recommendation evaluation.</label>
         <label><input type="checkbox" name="expenseConsent" checked={form.expenseConsent} onChange={change} /> I consent to my monthly expense totals being used for private service recommendations. Individual transactions are not shared.</label>
       </div>
-      <div className="production-actions"><button type="submit" className="primary" disabled={busy}>{busy ? 'Saving...' : 'Save production profile'}</button><button type="button" className="secondary" onClick={gps} disabled={busy}>Use current location</button><button type="button" className="secondary" onClick={remove} disabled={busy}>Delete production data</button></div>
+      <div className="production-actions"><button type="submit" className="primary" disabled={busy}>{busy ? 'Saving...' : 'Save production profile'}</button><button type="button" className="secondary" onClick={gps} disabled={busy || !window.isSecureContext} title={window.isSecureContext ? 'Use browser location' : 'Browser location requires HTTPS; coordinates can be entered manually'}>Use current location</button><button type="button" className="secondary" onClick={remove} disabled={busy}>Delete production data</button></div>
     </form>}
   </section>;
 }

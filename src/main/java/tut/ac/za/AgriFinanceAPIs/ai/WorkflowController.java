@@ -3,6 +3,7 @@ package tut.ac.za.AgriFinanceAPIs.ai;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.util.*;
+import java.math.BigDecimal;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -22,7 +23,8 @@ public class WorkflowController {
     public record Approval(@NotBlank @Size(max=100) String interruptId, @NotNull Boolean approved) {}
     public record Passage(String id,String title,String content,String url,String publisher,
             String region,String checkedOn,String reviewStatus) {}
-    public record Grounding(List<Passage> sources,String context,String system,String policyReply) {}
+    public record Grounding(List<Passage> sources,String context,String system,String policyReply,
+            Map<String,BigDecimal> ledger) {}
     public record GroundingQuery(@NotBlank @Size(max=2000) String prompt,@Size(max=2000) String searchQuery) {}
     private final RestClient gateway;
     private final FinanceService finance;
@@ -48,7 +50,8 @@ public class WorkflowController {
         return new Grounding(sources,"Verified current farmer ledger summary in ZAR: income="
                 +summary.getTotalIncome()+"; expenses="+summary.getTotalExpenses()+"; profit="+summary.getProfit()
                 +". These totals cover recorded entries only.",AssistantService.SYSTEM,
-                AssistantService.boundedAnswer(request.prompt()));
+                AssistantService.boundedAnswer(request.prompt()), Map.of("income", summary.getTotalIncome(),
+                        "expenses", summary.getTotalExpenses(), "profit", summary.getProfit()));
     }
 
     @PostMapping("/conversations")

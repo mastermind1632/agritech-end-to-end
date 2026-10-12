@@ -50,6 +50,7 @@ class RecommendationServiceTest {
         Expense e=new Expense(); e.setItem("Maize seed");
         when(expenses.findAllByFarmerIdOrderByDateDesc("own")).thenReturn(List.of(e));
         when(orders.findAllByStatusOrderByCreatedAtDesc("open")).thenReturn(List.of(order()));
+        when(orders.findById("order")).thenReturn(java.util.Optional.of(order()));
         when(products.findById("maize")).thenReturn(java.util.Optional.of(product()));
         var service=new RecommendationService(recs,farmers,expenses,products,orders,items);
         assertThat(service.generate("own")).hasSize(1);
@@ -67,7 +68,11 @@ class RecommendationServiceTest {
         assertThat(comparison.getFirst().productId()).isEqualTo("alternative");
         assertThat(comparison.getFirst().pricePerUnit()).isEqualByComparingTo("15");
         when(expenses.findAllByFarmerIdOrderByDateDesc("own")).thenReturn(List.of());
-        assertThat(service.generate("own")).isEmpty();
+        var discovery = service.generate("own");
+        assertThat(discovery).hasSize(1);
+        assertThat(discovery.getFirst().matchedItems()).isEmpty();
+        assertThat(discovery.getFirst().reason()).contains("no purchase match").doesNotContain("Matches your recorded purchases");
+        assertThat(service.quote("own", "order", 2).quote().quantity()).isEqualTo(2);
         when(expenses.findAllByFarmerIdOrderByDateDesc("own")).thenReturn(List.of(e));
         when(items.existsByGroupOrderIdAndFarmerId("order","own")).thenReturn(true);
         assertThat(service.generate("own")).isEmpty();

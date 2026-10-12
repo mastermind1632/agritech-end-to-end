@@ -260,7 +260,7 @@ jobs:
             backup='.releases/${{ github.sha }}'
             mkdir -p "$backup"
             chmod 700 .releases "$backup"
-            for file in .env docker-compose.prod.yml docker-compose.ai.yml docker-compose.https.yml; do
+            for file in .env docker-compose.prod.yml docker-compose.ai.yml docker-compose.segmentation.yml docker-compose.https.yml; do
               if [ -f "$file" ]; then cp -p "$file" "$backup/$file"; fi
             done
             docker compose --env-file .env -f docker-compose.prod.yml exec -T postgres pg_dump -U postgres -d agritech -Fc > "$backup/agritech.dump"

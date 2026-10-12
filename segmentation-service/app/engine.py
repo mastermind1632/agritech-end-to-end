@@ -1,4 +1,5 @@
 import hashlib
+from calendar import month_name
 import math
 from collections import Counter, defaultdict
 from datetime import date, timedelta
@@ -17,7 +18,7 @@ def distance_km(a, b):
 
 def segment(profile):
     size = "Small" if profile["hectares"] < 5 else "Medium" if profile["hectares"] < 50 else "Large"
-    return f"{size} {profile['crop']} growers, {profile['province']}, harvest month {profile['harvestMonth']}"
+    return f"{size} {profile['crop']} growers, {profile['province']}, harvest in {month_name[profile['harvestMonth']]}"
 
 
 def services(profile, expense_trend=None):

@@ -25,8 +25,10 @@ def route_for(question, previous_route=None, messages=()):
     text = normalise(question)
     if re.search(r"\b(profit|income|expenses?|ledger|budget)\b", text):
         return "finance"
+    if re.search(r'\b(buyers?|sell|selling)\b|produce markets', text):
+        return 'produce'
     if re.search(r"\b(price|buy|purchase|order|supplier|discount|catalogue|marketplace)\b", text) or re.search(
-            r"\b(where|how)\b.*\b(get|find|source)\b.*\b(seeds?|fertilisers?|fertilizers?)\b", text):
+            r"\b(where|how)\b.*\b(get|find|source)\b.*\b(seeds?|fertilisers?|fertilizers?)\b|recommendations?|opportunities|recommend.*\b(products?|suppliers?|seeds?)\b", text):
         return "buying"
     if re.fullmatch(r"(crop(s)? )?seeds?", text):
         return "buying"

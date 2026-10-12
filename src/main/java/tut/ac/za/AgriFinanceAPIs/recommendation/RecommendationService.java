@@ -55,9 +55,9 @@ public class RecommendationService {
             if (product == null || product.getProductName() == null || !validPrice(product, order)) continue;
             List<String> matched = history.stream().filter(h -> matches(h, product.getProductName()))
                     .distinct().limit(5).toList();
-            if (matched.isEmpty()) continue;
             result.add(new Opportunity(order.getId(), product.getId(), order.getId(), product.getProductName(),
-                    "Matches your recorded purchases: " + String.join(", ", matched)
+                    (matched.isEmpty() ? "Open group order to explore; no purchase match was found in your records"
+                            : "Matches your recorded purchases: " + String.join(", ", matched))
                     + ". Check the variety, pack size and supplier terms before joining.",
                     matched, remaining(order), compare(product, order, 1), equivalents(product)));
         }

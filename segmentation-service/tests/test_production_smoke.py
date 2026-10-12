@@ -40,6 +40,14 @@ class ProductionSmokeTest(unittest.TestCase):
                 if fail:
                     raise HTTPError(request.full_url, 500, '', {}, None)
                 return Response({'recommendations': [{'id': 'listing'}], 'impressionId': None})
+            if path.startswith('/market-intelligence/records?'):
+                return Response({'records': []})
+            if path == '/market-intelligence/demand':
+                return Response({'rows': [], 'forecasts': []})
+            if path == '/recommendations/farmer/farmer':
+                return Response([{'id': 'existing-order', 'productName': 'Recorded maize seed'}])
+            if path.startswith('/recommendations/existing-order/quote'):
+                return Response({'quote': {'supplierDiscountConfirmed': False}})
             if path == '/ai/conversations':
                 return Response({'conversationId': 'synthetic-thread'})
             if path == '/ai/conversations/synthetic-thread' and method == 'DELETE':
@@ -47,9 +55,19 @@ class ProductionSmokeTest(unittest.TestCase):
             if path.endswith('/turn'):
                 question = body['prompt']
                 if question == 'How do i water plants':
-                    return Response({'route': 'farming', 'response': 'Check soil moisture and water the roots.'})
+                    return Response({'route': 'farming', 'response': 'Check soil moisture and water the roots.', 'sources': [{'id': 'guide:water'}]})
+                if question == 'What is my recorded profit?':
+                    return Response({'route': 'finance', 'response': 'Recorded profit R0.00'})
+                if question == 'Find buyers for my produce':
+                    return Response({'route': 'produce', 'response': 'Your farm group: Small tomato growers'})
+                if question == 'Show my buying opportunities':
+                    return Response({'route': 'buying', 'response': 'Recorded maize seed'})
+                if body.get('action'):
+                    return Response({'approval': {'interruptId': 'cancel-test'}, 'actionReady': None})
                 return Response({'route': 'buying', 'response': 'Marketplace: check seeds.' if question != 'Which location'
                                  else 'I mean the town or province where your farm is.'})
+            if path.endswith('/resume'):
+                return Response({'approval': None, 'actionReady': None})
             return Response({})
 
         with patch.object(production_smoke, 'Store', return_value=store), patch.object(production_smoke, 'urlopen', side_effect=reply):
