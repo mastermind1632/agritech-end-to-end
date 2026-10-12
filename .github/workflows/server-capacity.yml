@@ -47,6 +47,15 @@ jobs:
             # Untagged, unused images only. Running/stopped-container images and tagged rollback releases are retained.
             docker image prune --force --filter 'until=24h'
             docker builder prune --force --filter 'until=24h'
+            # Stop only the unsuccessful gateway created by this release attempt, not another project.
+            gateway=agritech-end-to-end-caddy-1
+            if docker inspect "$gateway" >/dev/null 2>&1; then
+              project=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$gateway")
+              service=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.service"}}' "$gateway")
+              if [ "$project" = agritech-end-to-end ] && [ "$service" = caddy ]; then
+                docker stop "$gateway"
+              fi
+            fi
             df -h /
             docker system df
             curl --fail --silent --show-error http://127.0.0.1:8080/actuator/health
