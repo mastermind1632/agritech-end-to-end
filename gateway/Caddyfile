@@ -1,0 +1,15 @@
+{
+    auto_https disable_redirects
+    default_sni 84.8.135.181
+}
+
+https://84.8.135.181 {
+    tls {
+        issuer acme https://acme-v02.api.letsencrypt.org/directory {
+            profile shortlived
+            disable_http_challenge
+        }
+    }
+    header Strict-Transport-Security "max-age=86400"
+    reverse_proxy {$HTTPS_UPSTREAM:frontend:80}
+}
