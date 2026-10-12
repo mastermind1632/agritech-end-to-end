@@ -18,6 +18,7 @@ class ProductionSmokeTest(unittest.TestCase):
         accounts = []
         store = MagicMock()
         connection = store.connect.return_value.__enter__.return_value
+        deleted_conversations = []
 
         def reply(request, timeout):
             path = request.full_url.split('/api', 1)[1]
@@ -39,6 +40,16 @@ class ProductionSmokeTest(unittest.TestCase):
                 if fail:
                     raise HTTPError(request.full_url, 500, '', {}, None)
                 return Response({'recommendations': [{'id': 'listing'}], 'impressionId': None})
+            if path == '/ai/conversations':
+                return Response({'conversationId': 'synthetic-thread'})
+            if path == '/ai/conversations/synthetic-thread' and method == 'DELETE':
+                deleted_conversations.append(path)
+            if path.endswith('/turn'):
+                question = body['prompt']
+                if question == 'How do i water plants':
+                    return Response({'route': 'farming', 'response': 'Check soil moisture and water the roots.'})
+                return Response({'route': 'buying', 'response': 'Marketplace: check seeds.' if question != 'Which location'
+                                 else 'I mean the town or province where your farm is.'})
             return Response({})
 
         with patch.object(production_smoke, 'Store', return_value=store), patch.object(production_smoke, 'urlopen', side_effect=reply):
@@ -48,6 +59,7 @@ class ProductionSmokeTest(unittest.TestCase):
             else:
                 production_smoke.main()
         self.assertEqual(connection.execute.call_count, 2)
+        self.assertEqual(deleted_conversations, [] if fail else ['/ai/conversations/synthetic-thread'])
         for call, account in zip(connection.execute.call_args_list, accounts):
             self.assertEqual(call.args[0], 'DELETE FROM public.farmers WHERE id=%s AND contact=%s')
             self.assertEqual(call.args[1], account)

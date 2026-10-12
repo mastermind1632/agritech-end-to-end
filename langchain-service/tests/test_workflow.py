@@ -60,6 +60,50 @@ class WorkflowTests(unittest.TestCase):
         with self.assertRaises(HTTPException):
             self.workflow.turn("other-farmer", self.thread, "Bearer other", "seed")
 
+    def test_reported_seed_conversation_answers_latest_question(self):
+        responses = [self.ask(q) for q in ('Where can i get seeds', 'Crops seeds', 'Which location')]
+        self.assertTrue(all(r['route'] == 'buying' for r in responses))
+        self.assertEqual(len(set(r['response'] for r in responses)), 3)
+        self.assertIn('town or province where your farm is', responses[-1]['response'])
+        self.assertTrue(all('Ask which crop' not in r['response'] for r in responses))
+
+    def test_seed_typo_is_normalised_for_retrieval(self):
+        result = self.ask('Where can I get seeda')
+        self.assertEqual(self.backend.questions[-1], 'Where can I get seeds')
+        self.assertEqual(result['route'], 'buying')
+        self.assertIn('Marketplace', result['response'])
+
+    def test_plain_crop_and_town_answers_keep_the_seed_context(self):
+        self.ask('Where can I get seeds')
+        crop = self.ask('Beetroot')
+        self.assertEqual(crop['route'], 'buying')
+        self.assertNotIn('Which crop', crop['response'])
+        town = self.ask('Hazyview')
+        self.assertEqual(town['route'], 'buying')
+        self.assertIn('Beetroot', self.backend.questions[-1])
+        self.assertNotIn('Which crop', town['response'])
+        self.assertNotIn('Which town', town['response'])
+
+    def test_short_new_question_does_not_search_previous_seed_topic(self):
+        self.ask('Where can i get seeds')
+        self.model.seen.clear()
+        result = self.ask('How do i water plants')
+        self.assertEqual(self.backend.questions[-1], 'How do i water plants')
+        self.assertEqual(result['route'], 'farming')
+        self.assertFalse(any(m.type == 'ai' for m in self.model.seen))
+        self.assertIn('LATEST QUESTION', self.model.seen[-1].content)
+
+    def test_buying_citations_exclude_unrelated_ledger_and_water_sources(self):
+        original = self.backend.retrieve
+        def retrieve(*args):
+            result = original(*args)
+            result['sources'] += [{'id': 'guide:ledger', 'title': 'Ledger', 'content': 'Seeds cost money'},
+                                  {'id': 'source:water', 'title': 'Water', 'content': 'Crop water'}]
+            return result
+        self.backend.retrieve = retrieve
+        result = self.ask('Where can I get seeds?')
+        self.assertEqual([s['id'] for s in result['sources']], ['guide:seed'])
+
     def test_sqlite_memory_survives_new_engine(self):
         self.ask()
         other = Workflow(self.database, lambda options, route: FakeModel(), self.backend, Telemetry(enabled=False))

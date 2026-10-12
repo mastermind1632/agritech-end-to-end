@@ -12,6 +12,7 @@ from app.store import Store
 def main():
     base = 'http://spring-app:8080/api'
     accounts = []
+    conversations = []
     store = Store()
 
     def call(path, method='GET', body=None, token=None, expected=200):
@@ -21,7 +22,7 @@ def main():
         request = Request(base + path, method=method, headers=headers,
                           data=json.dumps(body).encode() if body is not None else None)
         try:
-            with urlopen(request, timeout=40) as response:
+            with urlopen(request, timeout=120) as response:
                 assert response.status == expected
                 return json.load(response)
         except HTTPError as error:
@@ -57,12 +58,32 @@ def main():
         call('/market-intelligence/options', token=farmer['token'])
         call('/market-intelligence/demand', token=farmer['token'])
         print('Production identity, profile, matching, privacy, ownership and consent contracts passed.')
+        conversation = call('/ai/conversations', 'POST', {}, farmer['token'])['conversationId']
+        conversations.append((conversation, farmer['token']))
+        replies = []
+        for question in ('Where can i get seeds', 'Crops seeds', 'Which location'):
+            reply = call(f'/ai/conversations/{conversation}/turn', 'POST', {'prompt': question}, farmer['token'])
+            assert reply['route'] == 'buying', 'Seed shopping must use catalogue grounding'
+            assert 'Ask which crop' not in reply['response'], 'Source instructions leaked into the answer'
+            replies.append(reply['response'])
+        assert 'Marketplace' in replies[0]
+        assert 'town or province where your farm is' in replies[-1]
+        assert replies[-1] != replies[0], 'Clarification repeated the previous answer'
+        water = call(f'/ai/conversations/{conversation}/turn', 'POST', {'prompt': 'How do i water plants'}, farmer['token'])
+        assert water['route'] == 'farming'
+        assert any(word in water['response'].lower() for word in ('soil', 'root', 'moisture')), 'General watering guidance missing'
+        assert 'seed' not in water['response'].lower(), 'Previous seed topic contaminated a new watering question'
+        print('Reported seed conversation, location clarification and real generated watering advice passed.')
     finally:
-        with store.connect() as connection:
-            for account, contact in accounts:
-                # Both identifiers must match; production users and their records cannot be selected.
-                connection.execute('DELETE FROM public.farmers WHERE id=%s AND contact=%s',
-                                   (account['farmer']['id'], contact))
+        try:
+            for conversation, token in conversations:
+                call('/ai/conversations/' + conversation, 'DELETE', token=token)
+        finally:
+            with store.connect() as connection:
+                for account, contact in accounts:
+                    # Both identifiers must match; production users and their records cannot be selected.
+                    connection.execute('DELETE FROM public.farmers WHERE id=%s AND contact=%s',
+                                       (account['farmer']['id'], contact))
         print('Only synthetic release-check accounts and their cascading records were removed.')
 
 
