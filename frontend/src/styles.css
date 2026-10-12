@@ -18,3 +18,11 @@
   .head-actions{flex-wrap:wrap}
   .filter{width:100%;max-width:100%;min-width:0}
 }
+.sidebar{overflow-y:auto}
+.sidebar-bottom{flex-shrink:0}
+.account-switch{display:flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap;border-radius:6px}
+@media(max-width:650px){
+  .topbar{height:auto;min-height:68px;padding-top:10px;padding-bottom:10px;flex-wrap:wrap;gap:8px}
+  .top-actions{flex-wrap:wrap;gap:8px;min-width:0;max-width:100%}
+  .top-actions .location-pill{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}

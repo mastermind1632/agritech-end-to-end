@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Login from './pages/Login';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
@@ -15,6 +15,10 @@ import Intelligence from './pages/Intelligence';
 import useFarmerNotices from './hooks/useFarmerNotices';
 
 const PAGES = { dashboard: Dashboard, finance: Finance, market: Marketplace, groups: Groups, ai: AI, intelligence: Intelligence, notifications: Notifications, chat: Chat, profile: Profile, supplier: SupplierPortal };
+
+function savedFarmer() {
+  try { if (!localStorage.getItem('agritech_token')) return null; return JSON.parse(localStorage.getItem('agritech_farmer')); } catch { return null; }
+}
 
 function Shell({ farmer, onLogout, onProductionSaved }) {
   const [page, setPage] = useState(farmer.setupProfile ? 'profile' : 'dashboard');
@@ -34,9 +38,15 @@ function Shell({ farmer, onLogout, onProductionSaved }) {
 }
 
 export default function App() {
-  const [farmer, setFarmer] = useState(() => {
-    try { if (!localStorage.getItem('agritech_token')) return null; return JSON.parse(localStorage.getItem('agritech_farmer')); } catch { return null; }
-  });
+  const [farmer, setFarmer] = useState(savedFarmer);
+  useEffect(() => {
+    const syncAccount = (event) => {
+      if (event.storageArea === localStorage && (event.key === null ||
+          event.key === 'agritech_token' || event.key === 'agritech_farmer')) setFarmer(savedFarmer());
+    };
+    window.addEventListener('storage', syncAccount);
+    return () => window.removeEventListener('storage', syncAccount);
+  }, []);
   const login = (f) => {
     localStorage.setItem('agritech_farmer', JSON.stringify(f.farmer || f));
     if (f.token) localStorage.setItem('agritech_token', f.token);
@@ -51,5 +61,5 @@ export default function App() {
     localStorage.setItem('agritech_farmer', JSON.stringify(updated));
     setFarmer(updated);
   };
-  return <Shell farmer={farmer} onLogout={logout} onProductionSaved={productionSaved} />;
+  return <Shell key={farmer.id} farmer={farmer} onLogout={logout} onProductionSaved={productionSaved} />;
 }
