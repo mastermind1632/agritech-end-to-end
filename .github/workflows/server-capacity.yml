@@ -44,8 +44,8 @@ jobs:
           script: |
             set -eu
             # Untagged, unused images only. Running/stopped-container images and tagged rollback releases are retained.
-            docker image prune --force --filter 'until=168h'
-            docker builder prune --force --filter 'until=168h'
+            docker image prune --force --filter 'until=24h'
+            docker builder prune --force --filter 'until=24h'
             df -h /
             docker system df
             curl --fail --silent --show-error http://127.0.0.1:8080/actuator/health
