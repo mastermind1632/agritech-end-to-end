@@ -26,7 +26,7 @@ jobs:
       - run: ./mvnw -B clean verify
 
   publish:
-    needs: [test, langchain-test, frontend-build]
+    needs: [test, langchain-test, segmentation-test, certificate-test, frontend-build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -93,6 +93,49 @@ jobs:
           cache-from: type=gha,scope=ollama-cpu
           cache-to: type=gha,mode=max,scope=ollama-cpu
 
+      - name: Publish market intelligence
+        uses: docker/build-push-action@v6
+        with:
+          context: ./segmentation-service
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ env.OWNER }}/agritech-segmentation:latest
+            ghcr.io/${{ env.OWNER }}/agritech-segmentation:${{ github.sha }}
+          cache-from: type=gha,scope=segmentation
+          cache-to: type=gha,mode=max,scope=segmentation
+
+      - name: Publish certificate maintenance image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./certificate-service
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ env.OWNER }}/agritech-certbot:latest
+            ghcr.io/${{ env.OWNER }}/agritech-certbot:${{ github.sha }}
+          cache-from: type=gha,scope=certbot
+          cache-to: type=gha,mode=max,scope=certbot
+
+      - name: Verify segmentation image starts with PostgreSQL
+        run: |
+          docker network create segmentation-smoke
+          docker run -d --name segmentation-db --network segmentation-smoke -e POSTGRES_PASSWORD=smoke-only-password -e POSTGRES_DB=segmentation_test postgres:17-alpine
+          trap 'docker rm -f segmentation-api segmentation-db; docker network rm segmentation-smoke' EXIT
+          for attempt in $(seq 1 30); do
+            if docker exec segmentation-db pg_isready -U postgres -d segmentation_test; then break; fi
+            sleep 2
+          done
+          docker exec -e PGPASSWORD=smoke-only-password segmentation-db psql -U postgres -d segmentation_test -c 'CREATE TABLE farmers(id varchar(36) PRIMARY KEY);'
+          docker run -d --name segmentation-api --network segmentation-smoke -p 127.0.0.1:8002:8002 \
+            -e PGHOST=segmentation-db -e PGDATABASE=segmentation_test -e PGPASSWORD=smoke-only-password \
+            ghcr.io/${{ env.OWNER }}/agritech-segmentation:${{ github.sha }}
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8002/health; then break; fi
+            sleep 2
+          done
+          curl --fail --silent --show-error http://127.0.0.1:8002/health
+
       - name: Verify CPU-only model generation
         env:
           OLLAMA_IMAGE: ghcr.io/${{ env.OWNER }}/agritech-ollama-cpu:${{ github.sha }}
@@ -132,6 +175,51 @@ jobs:
       - run: python -m unittest discover -s tests -v
         working-directory: langchain-service
 
+  segmentation-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test-only-password
+          POSTGRES_DB: segmentation_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d segmentation_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGPASSWORD: test-only-password
+      PGDATABASE: segmentation_test
+      SEGMENTATION_TEST_DATABASE: 'true'
+      MODEL_DIR: /tmp/agritech-test-models
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: segmentation-service/requirements.txt
+      - run: python -m pip install -r segmentation-service/requirements.txt
+      - run: python -m unittest discover -s tests -v
+        working-directory: segmentation-service
+
+  certificate-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install docker==7.1.0
+      - run: python -m unittest discover -s certificate-service/tests -v
+
   frontend-build:
     runs-on: ubuntu-latest
     permissions:
@@ -159,6 +247,27 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Preserve rollback configuration and back up PostgreSQL
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 10m
+          script: |
+            set -eu
+            cd ~/agritech-end-to-end
+            backup='.releases/${{ github.sha }}'
+            mkdir -p "$backup"
+            chmod 700 .releases "$backup"
+            for file in .env docker-compose.prod.yml docker-compose.ai.yml docker-compose.https.yml; do
+              if [ -f "$file" ]; then cp -p "$file" "$backup/$file"; fi
+            done
+            docker compose --env-file .env -f docker-compose.prod.yml exec -T postgres pg_dump -U postgres -d agritech -Fc > "$backup/agritech.dump"
+            chmod 600 "$backup/agritech.dump"
+            test -s "$backup/agritech.dump"
+            echo 'Current release configuration and database backup are preserved.'
+
       - name: Generate .env file locally
         env:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
@@ -176,6 +285,7 @@ jobs:
               "APP_JWT_SECRET": os.environ["APP_JWT_SECRET"],
               "AI_MODEL": "qwen2.5:0.5b",
               "AI_LANGSMITH_TRACING": "false",
+              "CERTBOT_IMAGE": "ghcr.io/" + os.environ["GITHUB_REPOSITORY_OWNER"].lower() + "/agritech-certbot:" + os.environ["GITHUB_SHA"],
           }
           assert values["POSTGRES_PASSWORD"], "POSTGRES_PASSWORD is required"
           assert len(values["APP_JWT_SECRET"]) >= 32, "APP_JWT_SECRET must have at least 32 characters"
@@ -192,7 +302,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          source: "docker-compose.prod.yml,docker-compose.ai.yml,.env"
+          source: "docker-compose.prod.yml,docker-compose.ai.yml,docker-compose.segmentation.yml,docker-compose.https.yml,frontend/nginx.https.conf,scripts/deploy-production.sh,scripts/renew-certificate.sh,scripts/install-certificate-renewal.sh,scripts/certificate-renewal.cron,.env"
           target: "~/agritech-end-to-end"
 
       - name: Deploy via SSH & Docker Compose
@@ -200,34 +310,20 @@ jobs:
         env:
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
           DOCKER_REGISTRY_OWNER: ${{ github.repository_owner }}
+          RELEASE_SHA: ${{ github.sha }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: GHCR_PAT,DOCKER_REGISTRY_OWNER
+          envs: GHCR_PAT,DOCKER_REGISTRY_OWNER,RELEASE_SHA
           command_timeout: 30m
           script: |
             set -eu
             cd ~/agritech-end-to-end
-            chmod 600 .env
-            df -h /
-            docker system df
-            printf '%s' "$GHCR_PAT" | docker login ghcr.io -u "$DOCKER_REGISTRY_OWNER" --password-stdin
-            docker compose --env-file .env -f docker-compose.prod.yml -f docker-compose.ai.yml config --quiet
-            docker compose --env-file .env -f docker-compose.prod.yml -f docker-compose.ai.yml pull
-            docker compose --env-file .env -f docker-compose.prod.yml -f docker-compose.ai.yml up -d --no-build --wait --wait-timeout 900
-            docker compose --env-file .env -f docker-compose.prod.yml -f docker-compose.ai.yml exec -T langchain-service python - <<'PY'
-            import json
-            from urllib.request import Request, urlopen
-            with urlopen("http://spring-app:8080/actuator/health", timeout=30) as response:
-                assert json.load(response)["status"] == "UP", "Backend is unhealthy"
-            body = {"model": "qwen2.5:0.5b", "system": "Give a short farming answer using the supplied fact.",
-                    "prompt": "Crop seed buyers should check germination. What should they check?",
-                    "options": {"num_predict": 60, "temperature": 0}}
-            request = Request("http://127.0.0.1:8001/api/generate", data=json.dumps(body).encode(),
-                              headers={"Content-Type": "application/json"})
-            with urlopen(request, timeout=240) as response:
-                assert json.load(response)["response"].strip(), "AI returned an empty answer"
-            print("Production backend health and real Qwen generation passed.")
-            PY
-            curl --fail --silent --show-error http://127.0.0.1:8080/actuator/health
+            sh scripts/deploy-production.sh
+
+      - name: Verify public encrypted release
+        run: |
+          curl --retry 3 --retry-all-errors --connect-timeout 15 --max-time 45 --fail --silent --show-error https://84.8.135.181:8080/actuator/health
+          status=$(curl --silent --output /dev/null --write-out '%{http_code}' http://84.8.135.181:8080/)
+          test "$status" = 308

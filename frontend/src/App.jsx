@@ -10,12 +10,13 @@ import Notifications from './pages/Notifications';
 import SupplierPortal from './pages/SupplierPortal';
 import Chat from './pages/Chat';
 import Profile from './pages/Profile';
+import Intelligence from './pages/Intelligence';
 import useFarmerNotices from './hooks/useFarmerNotices';
 
-const PAGES = { dashboard: Dashboard, finance: Finance, market: Marketplace, groups: Groups, ai: AI, notifications: Notifications, chat: Chat, profile: Profile, supplier: SupplierPortal };
+const PAGES = { dashboard: Dashboard, finance: Finance, market: Marketplace, groups: Groups, ai: AI, intelligence: Intelligence, notifications: Notifications, chat: Chat, profile: Profile, supplier: SupplierPortal };
 
-function Shell({ farmer, onLogout }) {
-  const [page, setPage] = useState('dashboard');
+function Shell({ farmer, onLogout, onProductionSaved }) {
+  const [page, setPage] = useState(farmer.setupProfile ? 'profile' : 'dashboard');
   const [initialOrder, setInitialOrder] = useState(null);
   const reviewOrder = (id, quantity = 1) => { setInitialOrder({ id, quantity }); setPage('groups'); };
   const notices = useFarmerNotices(farmer.id);
@@ -23,6 +24,7 @@ function Shell({ farmer, onLogout }) {
   return (
     <Layout page={page} setPage={setPage} farmer={farmer} onLogout={onLogout} noticeCount={notices.unread}>
       <Page farmer={farmer} setPage={setPage} notices={notices} reviewOrder={reviewOrder}
+        onProductionSaved={onProductionSaved}
         initialOrderId={initialOrder?.id} initialOrderQuantity={initialOrder?.quantity}
         onOrderOpened={() => setInitialOrder(null)} />
     </Layout>
@@ -42,5 +44,10 @@ export default function App() {
     localStorage.removeItem('agritech_farmer'); localStorage.removeItem('agritech_token'); setFarmer(null);
   };
   if (!farmer) return <Login onLogin={login} />;
-  return <Shell farmer={farmer} onLogout={logout} />;
+  const productionSaved = () => {
+    const updated = { ...farmer, setupProfile: false };
+    localStorage.setItem('agritech_farmer', JSON.stringify(updated));
+    setFarmer(updated);
+  };
+  return <Shell farmer={farmer} onLogout={logout} onProductionSaved={productionSaved} />;
 }

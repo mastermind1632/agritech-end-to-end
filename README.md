@@ -288,3 +288,13 @@ These items are deliberately documented instead of hidden: they give you credibl
 8. Switch to the Supplier Portal and show catalogue/notification activity.
 9. Open `/actuator/health` to demonstrate operational readiness.
 10. Explain the Docker + PostgreSQL + CI/CD architecture.
+
+## ML Market Segmentation (Floyd)
+
+The production-profile onboarding and Produce Markets screens are backed by a separate
+FastAPI market-intelligence service. It includes explainable buyer matching, consented
+analytics, clustering candidates, human-review promotion, drift checks and sourced market
+observation imports. It is separate from the Qwen chatbot.
+
+See [Floyd's implementation and operations guide](docs/FLOYD_SEGMENTATION.md) for scope,
+test commands, deployment, model review and data-dependent work that still requires real data.

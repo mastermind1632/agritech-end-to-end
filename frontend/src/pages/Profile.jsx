@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react';
 import Avatar, { avatarChanged } from '../components/Avatar';
 import { avatarApi } from '../lib/api';
+import ProductionProfile from '../components/ProductionProfile';
+import '../market-intelligence.css';
 
 const OK_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -20,7 +22,7 @@ async function prepare(file) {
   return new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
 }
 
-export default function Profile({ farmer }) {
+export default function Profile({ farmer, onProductionSaved }) {
   const input = useRef(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -83,6 +85,7 @@ export default function Profile({ farmer }) {
           </div>
         </div>
       </section>
+      <ProductionProfile onSaved={onProductionSaved} />
     </>
   );
 }

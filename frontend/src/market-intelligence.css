@@ -1,0 +1,48 @@
+.mi-workspace, .production-section { margin: 0 48px 32px; min-width: 0; }
+.production-section { padding-top: 24px; border-top: 1px solid #dce5de; }
+.production-section .notice, .mi-workspace .notice { margin: 12px 0 20px; }
+.profile-card > .avatar, .profile-card > .avatar-img { flex-shrink: 0; }
+.profile-card > div:last-child { min-width: 0; overflow-wrap: anywhere; }
+.production-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 20px 0 32px; }
+.production-form label, .mi-search label { display: flex; flex-direction: column; gap: 7px; font-size: 13px; font-weight: 600; min-width: 0; }
+.production-form input, .production-form select, .mi-search select { width: 100%; min-width: 0; box-sizing: border-box; padding: 10px; border: 1px solid #c7d3cb; background: white; border-radius: 4px; font: inherit; }
+.production-checks, .production-actions, .mi-disclosure { grid-column: 1 / -1; }
+.production-checks { display: grid; gap: 12px; }
+.production-checks label { flex-direction: row; align-items: flex-start; font-weight: 400; line-height: 1.5; }
+.production-checks input { width: 16px; height: 16px; flex: 0 0 16px; margin: 2px 0 0; }
+.production-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.mi-tabs { display: flex; border-bottom: 1px solid #c7d3cb; gap: 24px; margin-bottom: 24px; overflow-x: auto; }
+.mi-tabs button { border: 0; border-bottom: 3px solid transparent; background: none; padding: 12px 0; font: inherit; white-space: nowrap; cursor: pointer; color: #526057; }
+.mi-tabs button.active { border-bottom-color: #247943; color: #172f20; font-weight: 700; }
+.mi-workspace h2, .production-section h2 { font-size: 20px; margin: 20px 0 12px; }
+.mi-segment { border-left: 3px solid #247943; padding-left: 16px; margin-bottom: 28px; }
+.mi-segment h2 { overflow-wrap: anywhere; }
+.mi-listing { display: flex; justify-content: space-between; gap: 16px; padding: 20px 0; border-bottom: 1px solid #dce5de; }
+.mi-listing > div { min-width: 0; }
+.mi-listing h3 { font-size: 18px; margin: 10px 0; text-transform: capitalize; }
+.mi-listing h3 small { margin-left: 12px; color: #526057; font-size: 14px; }
+.mi-listing p, .mi-listing li { font-size: 13px; color: #526057; overflow-wrap: anywhere; }
+.mi-listing ul { padding-left: 18px; line-height: 1.6; }
+.mi-listing-actions { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 8px; }
+.mi-search { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 12px; align-items: end; margin-bottom: 24px; }
+.mi-empty { padding: 24px 0; color: #526057; }
+.mi-services { padding: 0; list-style: none; }
+.mi-services li { border-bottom: 1px solid #dce5de; padding: 16px 0; }
+.mi-services strong { text-transform: capitalize; }
+.mi-forecast { padding: 16px 0; border-bottom: 1px solid #dce5de; }
+.mi-forecast h3 { font-size: 16px; text-transform: capitalize; }
+.mi-table-wrap { overflow-x: auto; }
+.mi-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.mi-table th { text-align: left; color: #526057; background: #edf3ee; }
+.mi-table th, .mi-table td { padding: 14px 12px; border-bottom: 1px solid #dce5de; }
+.mi-table small, .mi-table a { display: block; margin-top: 6px; }
+.mi-disclosure { font-size: 13px; color: #526057; line-height: 1.5; }
+@media (max-width: 1100px) { .production-form { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 680px) {
+  .profile-card { flex-direction: column; align-items: flex-start; padding: 24px; }
+  .mi-workspace, .production-section { margin: 0 20px 24px; }
+  .production-form, .mi-search { grid-template-columns: minmax(0, 1fr); }
+  .mi-listing { flex-direction: column; }
+  .production-actions > button { max-width: 100%; white-space: normal; }
+  .mi-tabs { gap: 18px; font-size: 13px; }
+}

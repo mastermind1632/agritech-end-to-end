@@ -24,3 +24,5 @@ uploads/
 .ai-check/
 __pycache__/
 *.pyc
+segmentation-service/mlruns/
+segmentation-service/.venv/

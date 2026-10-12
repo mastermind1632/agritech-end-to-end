@@ -1,0 +1,49 @@
+# Add to the existing stack: -f docker-compose.segmentation.yml
+services:
+  spring-app:
+    environment:
+      AI_SEGMENTATION_URL: http://segmentation-service:8002
+
+  segmentation-service:
+    image: ghcr.io/${DOCKER_REGISTRY_OWNER:-mastermind1632}/agritech-segmentation:${AI_IMAGE_TAG:-latest}
+    build: ./segmentation-service
+    restart: unless-stopped
+    mem_limit: 768m
+    cpus: 2
+    environment: &segmentation-environment
+      PGHOST: postgres
+      PGDATABASE: ${POSTGRES_DB:-agritech}
+      PGUSER: ${POSTGRES_USER:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      AI_BACKEND_URL: http://spring-app:8080
+      MODEL_DIR: /data/models
+      MLFLOW_TRACKING_URI: sqlite:////data/mlflow.db
+      ENABLE_AB_TEST: ${SEGMENTATION_AB_TEST:-false}
+    volumes:
+      - segmentation_data:/data
+    depends_on:
+      spring-app:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health', timeout=8)"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 120s
+
+  segmentation-worker:
+    image: ghcr.io/${DOCKER_REGISTRY_OWNER:-mastermind1632}/agritech-segmentation:${AI_IMAGE_TAG:-latest}
+    build: ./segmentation-service
+    restart: unless-stopped
+    mem_limit: 1024m
+    cpus: 1
+    command: ["python", "-m", "app.jobs", "worker"]
+    environment: *segmentation-environment
+    volumes:
+      - segmentation_data:/data
+    depends_on:
+      segmentation-service:
+        condition: service_healthy
+
+volumes:
+  segmentation_data:

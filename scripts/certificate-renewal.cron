@@ -1,0 +1,2 @@
+# AgriTech IP certificate renewal. Only the ephemeral trusted maintenance container gets Docker access.
+17 0,12 * * * @USER@ /bin/sh @HOME@/agritech-end-to-end/scripts/renew-certificate.sh >> @HOME@/agritech-end-to-end/.certificate-renew.log 2>&1

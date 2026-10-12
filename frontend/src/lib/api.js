@@ -47,6 +47,18 @@ export const farmerApi = {
   register: (body) => api('/farmers/register', { method: 'POST', body: JSON.stringify(body) }),
   get: (id) => api(`/farmers/${id}`)
 };
+export const intelligenceApi = {
+  options: () => api('/market-intelligence/options'),
+  profile: () => api('/market-intelligence/profile'),
+  saveProfile: body => api('/market-intelligence/profile', { method: 'PUT', body: JSON.stringify(body) }),
+  deleteProfile: () => api('/market-intelligence/profile', { method: 'DELETE' }),
+  recommendations: () => api('/market-intelligence/recommendations'),
+  demand: () => api('/market-intelligence/demand'),
+  records: query => api(`/market-intelligence/records?${new URLSearchParams(query)}`),
+  addRecord: body => api('/market-intelligence/records', { method: 'POST', body: JSON.stringify(body) }),
+  deleteRecord: id => api(`/market-intelligence/records/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  feedback: body => api('/market-intelligence/feedback', { method: 'POST', body: JSON.stringify(body) })
+};
 export const financeApi = {
   summary: (id) => api(`/finance/${id}/summary`),
   expenses: (id) => api(`/finance/expenses/${id}`),
