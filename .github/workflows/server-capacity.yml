@@ -1,4 +1,4 @@
-name: Production Capacity Inspection
+name: Production Capacity Maintenance
 
 on:
   push:
@@ -34,3 +34,18 @@ jobs:
             if sudo -n true 2>/dev/null; then
               sudo iptables -S INPUT
             fi
+      - name: Reclaim old disposable image layers and build cache
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 10m
+          script: |
+            set -eu
+            # Untagged, unused images only. Running/stopped-container images and tagged rollback releases are retained.
+            docker image prune --force --filter 'until=168h'
+            docker builder prune --force --filter 'until=168h'
+            df -h /
+            docker system df
+            curl --fail --silent --show-error http://127.0.0.1:8080/actuator/health
