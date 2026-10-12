@@ -1,0 +1,78 @@
+name: Provision IP Certificate on Existing Ports
+
+on:
+  push:
+    branches: [ops/ip-certificate]
+    paths:
+      - .github/workflows/ip-certificate.yml
+      - certificate-service/**
+      - docker-compose.https.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  certificate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install docker==7.1.0
+      - run: python -m unittest discover -s certificate-service/tests -v
+      - run: echo "OWNER=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./certificate-service
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/${{ env.OWNER }}/agritech-certbot:${{ github.sha }}
+          cache-from: type=gha,scope=certbot
+          cache-to: type=gha,mode=max,scope=certbot
+      - uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "docker-compose.https.yml,frontend/nginx.https.conf,scripts/renew-certificate.sh"
+          target: "~/agritech-end-to-end"
+      - name: Issue trusted certificate without stopping either application
+        uses: appleboy/ssh-action@v1
+        env:
+          GHCR_PAT: ${{ secrets.GHCR_PAT }}
+          DOCKER_REGISTRY_OWNER: ${{ env.OWNER }}
+          CERTBOT_IMAGE: ghcr.io/${{ env.OWNER }}/agritech-certbot:${{ github.sha }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: GHCR_PAT,DOCKER_REGISTRY_OWNER,CERTBOT_IMAGE
+          command_timeout: 12m
+          script: |
+            set -eu
+            cd ~/agritech-end-to-end
+            printf '%s' "$GHCR_PAT" | docker login ghcr.io -u "$DOCKER_REGISTRY_OWNER" --password-stdin
+            docker compose --env-file .env -f docker-compose.prod.yml -f docker-compose.https.yml pull certbot
+            docker compose --env-file .env -f docker-compose.prod.yml -f docker-compose.https.yml run --rm --no-deps certbot \
+              certonly --manual --preferred-challenges http --preferred-profile shortlived \
+              --ip-address 84.8.135.181 --cert-name 84.8.135.181 \
+              --non-interactive --agree-tos --register-unsafely-without-email \
+              --manual-auth-hook 'python /hooks/acme_hook.py publish' \
+              --manual-cleanup-hook 'python /hooks/acme_hook.py cleanup'
+            docker compose --env-file .env -f docker-compose.prod.yml -f docker-compose.https.yml run --rm --no-deps \
+              --entrypoint python certbot -c 'import ssl; c=ssl._ssl._test_decode_cert("/etc/letsencrypt/live/84.8.135.181/fullchain.pem"); assert ("IP Address","84.8.135.181") in c["subjectAltName"]; print("Trusted IP certificate issued; expires",c["notAfter"])'
+            if docker inspect agritech-end-to-end-caddy-1 >/dev/null 2>&1; then
+              docker stop agritech-end-to-end-caddy-1
+            fi
+            curl --fail --silent --show-error http://127.0.0.1:8080/actuator/health
+            df -h /
