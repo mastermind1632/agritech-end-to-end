@@ -1,0 +1,140 @@
+{
+  "version": "1.0.0",
+  "branch": "feature/business-companion",
+  "lastVerified": "2026-10-12",
+  "description": "Step-by-step formalization and compliance workflow for the Business Companion module",
+  "steps": [
+    {
+      "stepNumber": 1,
+      "title": "Business plan",
+      "needsFirst": [],
+      "whereToDoIt": "In the app",
+      "aiAssistance": "Explains what a business plan is and helps draft one so the user adjusts numbers instead of starting blank.",
+      "officialSource": {
+        "name": "Internal Platform Tool",
+        "url": "",
+        "lastVerified": "2026-10-12"
+      }
+    },
+    {
+      "stepNumber": 2,
+      "title": "Choose a structure (Sole proprietor, (Pty) Ltd or co-operative)",
+      "needsFirst": [1],
+      "whereToDoIt": "In-app guidance; accountant for advice",
+      "aiAssistance": "Explains options in plain words regarding liability, tax, and funding eligibility.",
+      "officialSource": {
+        "name": "SAICA (Find an Accountant)",
+        "url": "www.saica.org.za",
+        "lastVerified": "2026-10-12"
+      }
+    },
+    {
+      "stepNumber": 3,
+      "title": "Choose a business name",
+      "needsFirst": [2],
+      "whereToDoIt": "In the app",
+      "aiAssistance": "Generates business name ideas.",
+      "officialSource": {
+        "name": "Internal Generator",
+        "url": "",
+        "lastVerified": "2026-10-12"
+      }
+    },
+    {
+      "stepNumber": 4,
+      "title": "Apply for / reserve the name",
+      "needsFirst": [3],
+      "whereToDoIt": "BizPortal / CIPC",
+      "aiAssistance": "Explains step-by-step how to reserve a name with CIPC.",
+      "officialSource": {
+        "name": "CIPC / BizPortal",
+        "url": "www.bizportal.gov.za",
+        "lastVerified": "2026-10-12"
+      }
+    },
+    {
+      "stepNumber": 5,
+      "title": "Register the business",
+      "needsFirst": [4],
+      "whereToDoIt": "BizPortal / CIPC",
+      "aiAssistance": "Answers questions the user does not understand during registration.",
+      "officialSource": {
+        "name": "CIPC",
+        "url": "www.cipc.co.za",
+        "lastVerified": "2026-10-12"
+      }
+    },
+    {
+      "stepNumber": 6,
+      "title": "Register for tax",
+      "needsFirst": [5],
+      "whereToDoIt": "SARS / eFiling",
+      "aiAssistance": "Explains income tax and VAT basics, prompts checking the current VAT threshold, and suggests an accountant.",
+      "officialSource": {
+        "name": "SARS eFiling",
+        "url": "www.sarsefiling.co.za",
+        "lastVerified": "2026-10-12"
+      }
+    },
+    {
+      "stepNumber": 7,
+      "title": "Occupational and health certificates / permits",
+      "needsFirst": [5],
+      "whereToDoIt": "Local municipality, Dept. of Water and Sanitation, GLOBALG.A.P.",
+      "aiAssistance": "Explains what permits are required and where to obtain them.",
+      "officialSource": {
+        "name": "Dept. of Water and Sanitation",
+        "url": "www.dws.gov.za",
+        "lastVerified": "2026-10-12"
+      }
+    },
+    {
+      "stepNumber": 8,
+      "title": "Business bank account",
+      "needsFirst": [5, 6],
+      "whereToDoIt": "Commercial banks",
+      "aiAssistance": "Explains what documents to bring and points to physical bank locations.",
+      "officialSource": {
+        "name": "Commercial Banks",
+        "url": "",
+        "lastVerified": "2026-10-12"
+      }
+    },
+    {
+      "stepNumber": 9,
+      "title": "Employee registrations (only if the business has employees)",
+      "needsFirst": [6],
+      "whereToDoIt": "Dept. of Employment and Labour / uFiling",
+      "aiAssistance": "Explains UIF and COIDA requirements.",
+      "officialSource": {
+        "name": "uFiling",
+        "url": "www.ufiling.co.za",
+        "lastVerified": "2026-10-12"
+      }
+    },
+    {
+      "stepNumber": 10,
+      "title": "Keep records",
+      "needsFirst": [8],
+      "whereToDoIt": "In the app (Expense module)",
+      "aiAssistance": "Explains what records to keep (invoices, statements, payroll) and retention periods (SARS generally requires 5 years).",
+      "officialSource": {
+        "name": "SARS",
+        "url": "www.sars.gov.za",
+        "lastVerified": "2026-10-12"
+      }
+    },
+    {
+      "stepNumber": 11,
+      "title": "Apply for funding",
+      "needsFirst": [1, 5, 8, 10],
+      "whereToDoIt": "Land Bank, NEF, SEDFA",
+      "aiAssistance": "Points to potential funders and explains what documents they ask for.",
+      "officialSource": {
+        "name": "SEDFA / Land Bank",
+        "url": "www.sedfa.org.za",
+        "lastVerified": "2026-10-12"
+      }
+    }
+  ]
+}
