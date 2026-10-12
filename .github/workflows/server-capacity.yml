@@ -31,6 +31,7 @@ jobs:
             docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Ports}}'
             docker image ls --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}' | head -70
             ss -lnt | grep -E ':(80|443|8080)\b' || true
+            docker exec agritech_lema_frontend nginx -T 2>&1 | grep -E 'root |try_files|well-known|location.*\\.' || true
             if sudo -n true 2>/dev/null; then
               sudo iptables -S INPUT
             fi
