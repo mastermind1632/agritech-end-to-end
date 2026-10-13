@@ -1,0 +1,7 @@
+services:
+  ollama:
+    ports:
+      - "127.0.0.1:11434:11434"
+  langchain-service:
+    ports:
+      - "127.0.0.1:8001:8001"

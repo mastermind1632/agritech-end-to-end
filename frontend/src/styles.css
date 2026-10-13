@@ -163,3 +163,9 @@ html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:non
   .top-actions{flex-wrap:wrap;gap:8px;min-width:0;max-width:100%}
   .top-actions .location-pill{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 }
+
+/* Farm Market cards: equal height, price and buttons always sit along the bottom edge */
+.product-grid{align-items:stretch}
+.product-card{display:flex;flex-direction:column;min-width:0}
+.product-body{display:flex;flex-direction:column;flex:1 1 auto;min-width:0}
+.product-body .product-foot{margin-top:auto}

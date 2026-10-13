@@ -47,7 +47,7 @@ export async function api(path, options = {}) {
 
   if (!res.ok) {
     const msg = (data && typeof data === 'object' && (data.message || data.detail || data.error)) || (typeof data === 'string' && data) || '';
-    const error = new Error(msg || `Request failed (${res.status})`);
+    const error = new Error(msg || friendlyStatus(res.status));
     error.status = res.status;
     throw error;
   }
