@@ -18,15 +18,18 @@ function friendlyStatus(status) {
 
 export async function api(path, options = {}) {
   const token = localStorage.getItem(TOKEN_KEY);
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+  const headers = {
+    ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options.headers || {})
+  };
+  if (isFormData) delete headers['Content-Type'];
   let res;
   try {
     res = await fetch(`${API}${path}`, {
       ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(options.headers || {})
-      }
+      headers
     });
   } catch {
     throw new Error('We could not connect. Please check your internet connection and try again.');
@@ -121,6 +124,47 @@ export const chatApi = {
   send: (room, body) => api(`/chat/rooms/${encodeURIComponent(room)}/messages`, { method: 'POST', body: JSON.stringify({ body }) })
 };
 
+export const exportApi = {
+  applications: () => api('/exports/applications'),
+  application: id => api(`/exports/applications/${encodeURIComponent(id)}`),
+  createApplication: body => api('/exports/applications', { method: 'POST', body: JSON.stringify(body) }),
+  updateApplication: (id, body) => api(`/exports/applications/${encodeURIComponent(id)}`,
+    { method: 'PUT', body: JSON.stringify(body) }),
+  updateTask: (id, taskKey, body) => api(`/exports/applications/${encodeURIComponent(id)}/tasks/${encodeURIComponent(taskKey)}`,
+    { method: 'PUT', body: JSON.stringify(body) }),
+  requirements: (product, destination) => api(`/exports/requirements?${new URLSearchParams({ product, destination })}`),
+  uploadDocument: (id, formData) => api(`/exports/applications/${encodeURIComponent(id)}/documents`,
+    { method: 'POST', body: formData }),
+  updateDocument: (id, body) => api(`/exports/documents/${encodeURIComponent(id)}`,
+    { method: 'PUT', body: JSON.stringify(body) }),
+  deleteDocument: id => api(`/exports/documents/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  downloadDocument: async id => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const response = await fetch(`${API}/exports/documents/${encodeURIComponent(id)}/download`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      let message = 'We could not download that document.';
+      try {
+        const data = text ? JSON.parse(text) : null;
+        if (data?.message) message = data.message;
+      } catch { /* Keep the plain-language fallback for non-JSON errors. */ }
+      throw new Error(message);
+    }
+    return response.blob();
+  },
+  createConsignment: (id, body) => api(`/exports/applications/${encodeURIComponent(id)}/consignments`,
+    { method: 'POST', body: JSON.stringify(body) }),
+  updateConsignment: (applicationId, consignmentId, body) => api(
+    `/exports/applications/${encodeURIComponent(applicationId)}/consignments/${encodeURIComponent(consignmentId)}`,
+    { method: 'PUT', body: JSON.stringify(body) }),
+  close: (id, body) => api(`/exports/applications/${encodeURIComponent(id)}/close`,
+    { method: 'PUT', body: JSON.stringify(body) }),
+  getShipments: (farmerId) => api(`/export/${farmerId}`),
+  createShipment: (farmerId, data) => api(`/export/${farmerId}`, { method: 'POST', body: JSON.stringify(data) })
+};
+
 const authHeader = () => {
   const t = localStorage.getItem(TOKEN_KEY);
   return t ? { Authorization: `Bearer ${t}` } : {};
@@ -165,12 +209,6 @@ export const complianceApi = {
   getReminders: (farmerId) => api(`/compliance/${farmerId}/reminders`),
   regenerateReminders: (farmerId) => api(`/compliance/${farmerId}/reminders/regenerate`, { method: 'POST' }),
   sendReminder: (farmerId, reminderId) => api(`/compliance/${farmerId}/reminders/${reminderId}/send-now`, { method: 'POST' })
-};
-
-// --- PPECB Export (?5) ---
-export const exportApi = {
-  getShipments: (farmerId) => api(`/export/${farmerId}`),
-  createShipment: (farmerId, data) => api(`/export/${farmerId}`, { method: 'POST', body: JSON.stringify(data) })
 };
 
 // --- Statement Analysis (?6) ---
