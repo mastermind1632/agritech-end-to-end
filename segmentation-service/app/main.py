@@ -9,12 +9,13 @@ from urllib.request import Request, urlopen
 from uuid import UUID
 
 import psycopg
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse
 
 from app.engine import RULE_VERSION, demand_summary, experiment_arm, market_forecasts, matches, segment, services
 from app.models import CROPS, PROVINCES, FarmProfile, Feedback, MarketRecord
 from app.store import Store
+from app.ocr import extract_statement
 from app.training import active_segment
 
 store = Store()
@@ -171,3 +172,23 @@ def demand(owner=Depends(identity)):
             "forecasts": market_forecasts(store.prices()),
             "pipeline": store.job("nightly_snapshot"),
             "notice": "Requests and failed searches are demand signals, not completed sales. Historical prices do not prove profit."}
+
+
+@app.post("/api/ocr/extract")
+async def ocr_extract(file: UploadFile = File(...), owner=Depends(identity)):
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(422, "Only PDF files are supported for extraction at this time.")
+    contents = await file.read()
+    if len(contents) > 10 * 1024 * 1024:
+        raise HTTPException(413, "File is too large. Maximum size is 10MB.")
+    
+    try:
+        import asyncio
+        result = await asyncio.to_thread(extract_statement, contents, file.filename)
+        return result
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    except RuntimeError as e:
+        raise HTTPException(500, str(e))
+    except Exception as e:
+        raise HTTPException(500, "Failed to process PDF statement.")
