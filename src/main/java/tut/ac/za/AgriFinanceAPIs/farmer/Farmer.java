@@ -26,6 +26,9 @@ public class Farmer {
     @Column(length = 100, unique = true)
     private String contact;
 
+    @Column(name = "phone_number", length = 20)
+    private String phoneNumber;
+
     @Column(name = "password_hash", length = 255)
     private String passwordHash;
 
@@ -57,6 +60,9 @@ public class Farmer {
 
     public String getContact() { return contact; }
     public void setContact(String contact) { this.contact = contact; }
+
+    public String getPhoneNumber() { return phoneNumber; }
+    public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
 
     public String getPasswordHash() { return passwordHash; }
     public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }

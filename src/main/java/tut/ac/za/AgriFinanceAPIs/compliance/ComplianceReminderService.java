@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import tut.ac.za.AgriFinanceAPIs.compliance.delivery.ReminderDeliveryService;
 import tut.ac.za.AgriFinanceAPIs.farmer.FarmerRepository;
 
 import java.time.LocalDate;
@@ -18,13 +19,16 @@ public class ComplianceReminderService {
     private final ComplianceReminderRepository reminders;
     private final BusinessComplianceRepository complianceRepository;
     private final FarmerRepository farmers;
+    private final ReminderDeliveryService delivery;
 
     public ComplianceReminderService(ComplianceReminderRepository reminders,
                                      BusinessComplianceRepository complianceRepository,
-                                     FarmerRepository farmers) {
+                                     FarmerRepository farmers,
+                                     ReminderDeliveryService delivery) {
         this.reminders = reminders;
         this.complianceRepository = complianceRepository;
         this.farmers = farmers;
+        this.delivery = delivery;
     }
 
     public List<ComplianceReminder> listForFarmer(String farmerId) {
@@ -102,18 +106,33 @@ public class ComplianceReminderService {
         return candidate;
     }
 
+    /**
+     * Deliver every reminder whose trigger date has arrived. A reminder is only
+     * marked sent=true if delivery succeeded; failures stay at sent=false so the
+     * next scheduler tick retries them. This makes the cron idempotent and safe
+     * to run multiple times per day.
+     */
     @Transactional
     public int dispatchDue() {
         LocalDate today = LocalDate.now();
         List<ComplianceReminder> due = reminders.findBySentFalseAndTriggerDateLessThanEqual(today);
-        int count = 0;
+        int dispatched = 0;
         for (ComplianceReminder r : due) {
-            // Delivery (SMS/WhatsApp/email) is a future step.
-            // Mark as sent in-app; replace with delivery service call later.
-            r.setSent(true);
-            reminders.save(r);
-            count++;
+            boolean ok;
+            try {
+                ok = delivery.deliver(r);
+            } catch (RuntimeException ex) {
+                org.slf4j.LoggerFactory.getLogger(ComplianceReminderService.class)
+                    .warn("Delivery threw for reminder {} (farmer {}): {}",
+                        r.getId(), r.getFarmerId(), ex.getMessage());
+                ok = false;
+            }
+            if (ok) {
+                r.setSent(true);
+                reminders.save(r);
+                dispatched++;
+            }
         }
-        return count;
+        return dispatched;
     }
 }
