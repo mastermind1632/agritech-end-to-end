@@ -2,7 +2,7 @@ name: AgriFinance CI/CD
 
 on:
   push:
-    branches: [main, feature/lema-ai-services]
+    branches: [main, feature/lema-ai-services, feature/export-readiness]
   pull_request:
     branches: [main]
 

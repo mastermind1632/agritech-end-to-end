@@ -146,10 +146,10 @@ const STAGES = [
     name: 'Shipped and closed',
     meaning: 'Keep an administrative record of what actually happened to the shipment.',
     actions: 'Enter the final consignment reference, actual outcome and date. Attach relevant evidence, note unresolved issues and record lessons.',
-    how: 'Wait until you know the actual result, then choose the closest outcome and record its date. For Shipped or Partly shipped, attach applicable customs evidence under Stage 7.',
+    how: 'Wait until you know the actual result, then choose the closest outcome and record its date. For Shipped or Partly shipped, record an applicable customs-related document under Stage 7. This tracker does not verify the document or confirm customs clearance.',
     documentGroups: {
       required: [],
-      conditional: ['For a shipped or partly shipped outcome, customs evidence is required by this tracker to close the record; this is not a legal or customs determination.'],
+      conditional: ['For a shipped or partly shipped outcome, this tracker requires a customs-related document to be recorded under Stage 7 before closing. This checks only that a file is recorded under that category; it does not verify the contents, authenticity or official acceptance of the document, or confirm customs clearance.'],
       buyerOptional: ['Buyer receipt or other outcome evidence, if available or requested.'],
       toConfirm: ['Which final transport, consignment and customs records apply to the actual shipment outcome.']
     },
@@ -181,7 +181,7 @@ const DOC_TYPES = [
   ['INSPECTION_RECORD', 'Inspection record'],
   ['OFFICIAL_CERTIFICATE', 'Official certificate actually received'],
   ['COMMERCIAL_DOCUMENT', 'Commercial document'],
-  ['CUSTOMS_CLEARANCE', 'Customs clearance evidence'],
+  ['CUSTOMS_CLEARANCE', 'Customs-related document (recorded by you)'],
   ['OTHER', 'Other']
 ];
 
@@ -231,7 +231,7 @@ const STAGE_DOCUMENT_ITEMS = {
     { key: 'official-certificate', label: 'Official certificate actually received', documentType: 'OFFICIAL_CERTIFICATE', applicability: 'applicable', hasExpiry: true, text: 'Upload only a certificate an authority issued to you, if one applies.' }
   ],
   7: [
-    { key: 'customs-evidence', label: 'Customs declaration or clearance evidence', documentType: 'CUSTOMS_CLEARANCE', applicability: 'applicable', text: 'Only declarations or clearance evidence you actually received.' },
+    { key: 'customs-evidence', label: 'Customs declaration or clearance document', documentType: 'CUSTOMS_CLEARANCE', applicability: 'applicable', text: 'Upload only a customs-related document you actually received. This tracker records the file but does not verify its contents, authenticity or official acceptance.' },
     { key: 'customs-support', label: 'Supporting customs documents', documentType: 'COMMERCIAL_DOCUMENT', applicability: 'applicable', text: 'For example proof of origin, where it applies to your shipment.' }
   ],
   8: [
@@ -646,7 +646,7 @@ export default function ExportReadiness() {
         <div>
           <p className="eyebrow">EXPORT READINESS</p>
           <h1>Prepare your export</h1>
-          <p className="muted">Track your export preparation, requirements and supporting records.</p>
+          <p className="muted">Track your export preparation, requirements and supporting records. AgriTech does not issue official export approvals, and uploaded documents are not officially verified.</p>
         </div>
         <button className="primary" type="button" onClick={startNew}>＋ New application</button>
       </div>

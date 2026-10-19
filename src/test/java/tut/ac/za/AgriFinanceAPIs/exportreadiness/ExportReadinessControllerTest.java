@@ -102,13 +102,23 @@ class ExportReadinessControllerTest {
                 "shipmentOutcome", "SHIPPED",
                 "shipmentDate", "2026-10-16");
 
-        when(documents.countByApplicationIdAndDocumentType(7L, "CUSTOMS_CLEARANCE")).thenReturn(0L);
+        when(documents.countByApplicationIdAndStageNumberAndDocumentType(7L, 7, "CUSTOMS_CLEARANCE"))
+                .thenReturn(0L);
         ResponseStatusException missingEvidence = assertThrows(ResponseStatusException.class,
                 () -> controller.close(7L, closure, farmer));
         assertEquals(HttpStatus.BAD_REQUEST, missingEvidence.getStatusCode());
+        assertTrue(missingEvidence.getReason().contains("does not verify its contents"));
         assertFalse(app.isClosed());
 
-        when(documents.countByApplicationIdAndDocumentType(7L, "CUSTOMS_CLEARANCE")).thenReturn(1L);
+        Map<String, Object> partialClosure = new java.util.HashMap<>(closure);
+        partialClosure.put("shipmentOutcome", "PARTIALLY_SHIPPED");
+        ResponseStatusException missingPartialEvidence = assertThrows(ResponseStatusException.class,
+                () -> controller.close(7L, partialClosure, farmer));
+        assertEquals(HttpStatus.BAD_REQUEST, missingPartialEvidence.getStatusCode());
+        assertFalse(app.isClosed());
+
+        when(documents.countByApplicationIdAndStageNumberAndDocumentType(7L, 7, "CUSTOMS_CLEARANCE"))
+                .thenReturn(1L);
         when(applications.save(app)).thenReturn(app);
         Map<String, Object> result = controller.close(7L, closure, farmer);
 
@@ -116,6 +126,8 @@ class ExportReadinessControllerTest {
         assertEquals("CLOSED", result.get("status"));
         assertEquals("SHIPPED", result.get("shipmentOutcome"));
         assertFalse(result.containsKey("customsCleared"));
+        verify(documents, org.mockito.Mockito.times(3))
+                .countByApplicationIdAndStageNumberAndDocumentType(7L, 7, "CUSTOMS_CLEARANCE");
     }
 
     @Test
@@ -133,6 +145,31 @@ class ExportReadinessControllerTest {
         org.mockito.ArgumentCaptor<ExportDocument> saved = org.mockito.ArgumentCaptor.forClass(ExportDocument.class);
         verify(documents).save(saved.capture());
         assertEquals("CUSTOMS_CLEARANCE", saved.getValue().getDocumentType());
+    }
+
+    @Test
+    void documentUploadAcceptsExactlyTenMegabytesAndRejectsLargerFiles() throws Exception {
+        when(applications.findById(7L)).thenReturn(Optional.of(ownedApplication()));
+        when(documents.save(any(ExportDocument.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        byte[] maximumFile = new byte[10 * 1024 * 1024];
+        java.util.Arrays.fill(maximumFile, (byte) 'a');
+
+        Map<String, Object> result = controller.uploadDocument(7L,
+                new MockMultipartFile("file", "maximum.csv", "text/csv", maximumFile),
+                "OTHER", 1, null, null, null, farmer);
+
+        assertEquals("maximum.csv", result.get("fileName"));
+        org.mockito.ArgumentCaptor<ExportDocument> saved = org.mockito.ArgumentCaptor.forClass(ExportDocument.class);
+        verify(documents).save(saved.capture());
+        assertEquals(10 * 1024 * 1024, saved.getValue().getData().length);
+
+        byte[] oversizedFile = java.util.Arrays.copyOf(maximumFile, maximumFile.length + 1);
+        ResponseStatusException tooLarge = assertThrows(ResponseStatusException.class,
+                () -> controller.uploadDocument(7L,
+                        new MockMultipartFile("file", "oversized.csv", "text/csv", oversizedFile),
+                        "OTHER", 1, null, null, null, farmer));
+        assertEquals(HttpStatus.valueOf(413), tooLarge.getStatusCode());
+        verify(documents, org.mockito.Mockito.times(1)).save(any(ExportDocument.class));
     }
 
     @Test

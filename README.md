@@ -35,6 +35,13 @@ Spring Boot REST API
     PostgreSQL
 ```
 
+Export Readiness is a farmer-recorded guidance and tracking feature. A customs-related
+document category or uploaded file is not verification of authenticity or official
+customs clearance. The production Compose configuration permits files up to 10 MB
+each, with a 12 MB multipart request limit. The local Docker Compose setup uses the
+same limits. The HTTP and HTTPS Nginx configurations also allow multipart requests
+up to 12 MB so 10 MB documents can pass through the frontend proxy.
+
 ## Run with Docker
 
 1. Copy `.env.example` to `.env`.

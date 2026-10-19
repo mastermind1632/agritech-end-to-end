@@ -310,8 +310,10 @@ public class ExportReadinessController {
         }
         LocalDate date = parseDate(requiredString(body, "shipmentDate", 40), "shipment date");
         if ((outcome.equals("SHIPPED") || outcome.equals("PARTIALLY_SHIPPED"))
-                && documents.countByApplicationIdAndDocumentType(id, "CUSTOMS_CLEARANCE") == 0) {
-            throw bad("Actual shipment closure needs customs-clearance evidence. Upload it under Stage 7 Customs clearance.");
+                && documents.countByApplicationIdAndStageNumberAndDocumentType(id, 7, "CUSTOMS_CLEARANCE") == 0) {
+            throw bad("Record a customs-related document under Stage 7 Customs clearance to close this tracker record. "
+                    + "This check only confirms a file is recorded under that category; it does not verify its contents, "
+                    + "authenticity, or official acceptance.");
         }
         application.setShipmentReference(reference);
         application.setShipmentOutcome(outcome);
