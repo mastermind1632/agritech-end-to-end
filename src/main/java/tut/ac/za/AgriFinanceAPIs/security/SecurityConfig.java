@@ -52,6 +52,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/group-orders", "/api/group-orders/*").permitAll()
                 // Product photos are public so a plain <img> tag can load them (it cannot send a login header).
                 .requestMatchers(HttpMethod.GET, "/api/market/images/*").permitAll()
+                .requestMatchers("/api/finance/statement/**", "/api/compliance/**", "/api/export/**").permitAll()
                 .anyRequest().authenticated())
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
