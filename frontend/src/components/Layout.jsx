@@ -11,6 +11,7 @@ const nav = [
   ['ai', 'Buying Tips', 'spark'],
   ['exports', 'Export Readiness', 'leaf'],
   ['operations', 'Operations', 'grid'],
+  ['intelligence', 'Market Intelligence', 'spark'],
   ['notifications', 'Notifications', 'bell'],
   ['chat', 'Chat', 'chat'],
   ['supplier', 'Supplier Portal', 'market']
@@ -97,3 +98,4 @@ export default function Layout({ page, setPage, farmer, onLogout, children, noti
     </div>
   );
 }
+
