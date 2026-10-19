@@ -11,10 +11,11 @@ import Notifications from './pages/Notifications';
 import SupplierPortal from './pages/SupplierPortal';
 import Chat from './pages/Chat';
 import Profile from './pages/Profile';
+import Operations from './pages/Operations';
 import DeploymentNotice from './components/DeploymentNotice';
 import useFarmerNotices from './hooks/useFarmerNotices';
 
-const PAGES = { dashboard: Dashboard, finance: Finance, market: Marketplace, farmmarket: FarmMarket, groups: Groups, ai: AI, notifications: Notifications, chat: Chat, profile: Profile, supplier: SupplierPortal };
+const PAGES = { dashboard: Dashboard, operations: Operations, finance: Finance, market: Marketplace, farmmarket: FarmMarket, groups: Groups, ai: AI, notifications: Notifications, chat: Chat, profile: Profile, supplier: SupplierPortal };
 
 function savedFarmer() {
   try { if (!localStorage.getItem('agritech_token')) return null; return JSON.parse(localStorage.getItem('agritech_farmer')); } catch { return null; }
@@ -63,3 +64,4 @@ export default function App() {
   };
   return <Shell key={farmer.id} farmer={farmer} onLogout={logout} onProductionSaved={productionSaved} />;
 }
+
