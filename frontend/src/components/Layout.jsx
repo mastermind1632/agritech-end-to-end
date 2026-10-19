@@ -9,6 +9,7 @@ const nav = [
   ['farmmarket', 'Farm Market', 'market'],
   ['groups', 'Group Orders', 'users'],
   ['ai', 'Buying Tips', 'spark'],
+  ['exports', 'Export Readiness', 'leaf'],
   ['notifications', 'Notifications', 'bell'],
   ['chat', 'Chat', 'chat'],
   ['supplier', 'Supplier Portal', 'market']

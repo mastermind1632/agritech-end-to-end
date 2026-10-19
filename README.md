@@ -289,6 +289,7 @@ These items are deliberately documented instead of hidden: they give you credibl
 9. Open `/actuator/health` to demonstrate operational readiness.
 10. Explain the Docker + PostgreSQL + CI/CD architecture.
 
+
 ## ML Market Segmentation (Floyd)
 
 The production-profile onboarding and Produce Markets screens are backed by a separate
