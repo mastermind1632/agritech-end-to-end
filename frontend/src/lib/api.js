@@ -213,5 +213,20 @@ export const complianceApi = {
 
 // --- Statement Analysis (?6) ---
 export const statementApi = {
-  analyze: (payload) => api('/finance/statement/analyze', { method: 'POST', body: JSON.stringify(payload) })
+  analyze: (payload) => api('/finance/statement/analyze', { method: 'POST', body: JSON.stringify(payload) }),
+  uploadAndAnalyze: async (file) => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch(`${API}/finance/statement/upload`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: fd
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || data.detail || 'Upload failed');
+    return data;
+  }
 };
+
+

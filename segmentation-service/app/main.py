@@ -191,4 +191,7 @@ async def ocr_extract(file: UploadFile = File(...), owner=Depends(identity)):
     except RuntimeError as e:
         raise HTTPException(500, str(e))
     except Exception as e:
-        raise HTTPException(500, "Failed to process PDF statement.")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(500, f"OCR processing error: {type(e).__name__}: {str(e)}")
+
