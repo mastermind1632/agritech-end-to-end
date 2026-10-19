@@ -1,18 +1,28 @@
 package tut.ac.za.AgriFinanceAPIs.farmer;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import tut.ac.za.AgriFinanceAPIs.compliance.BusinessCompliance;
+import tut.ac.za.AgriFinanceAPIs.compliance.BusinessComplianceRepository;
 
 @Service
 public class FarmerService {
+    private static final Logger log = LoggerFactory.getLogger(FarmerService.class);
+
     private final FarmerRepository farmerRepository;
     private final PasswordEncoder passwordEncoder;
+    private final BusinessComplianceRepository complianceRepository;
 
-    public FarmerService(FarmerRepository farmerRepository, PasswordEncoder passwordEncoder) {
+    public FarmerService(FarmerRepository farmerRepository,
+                         PasswordEncoder passwordEncoder,
+                         BusinessComplianceRepository complianceRepository) {
         this.farmerRepository = farmerRepository;
         this.passwordEncoder = passwordEncoder;
+        this.complianceRepository = complianceRepository;
     }
 
     public Farmer register(String name, String location, String contact, String password) {
@@ -28,7 +38,20 @@ public class FarmerService {
         farmer.setLocation(location);
         farmer.setContact(contact.trim());
         farmer.setPasswordHash(passwordEncoder.encode(password));
-        return farmerRepository.save(farmer);
+        Farmer saved = farmerRepository.save(farmer);
+
+        // Create an empty business-compliance profile so the reminder backfill
+        // scheduler can find this farmer on its next run, even if they never
+        // open the compliance screen. Failure here must not block registration.
+        try {
+            BusinessCompliance bc = new BusinessCompliance();
+            bc.setFarmerId(saved.getId());
+            complianceRepository.save(bc);
+        } catch (Exception ex) {
+            log.warn("Could not create business-compliance row for new farmer {}: {}", saved.getId(), ex.getMessage());
+        }
+
+        return saved;
     }
 
     public Farmer login(String contact, String password) {
