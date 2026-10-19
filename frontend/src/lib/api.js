@@ -5,7 +5,6 @@ const API = import.meta.env.VITE_API_URL || '/api';
 export const TOKEN_KEY = 'agritech_token';
 export const FARMER_KEY = 'agritech_farmer';
 
-// Plain-language message for when the server gives no specific reason.
 function friendlyStatus(status) {
   if (status === 400 || status === 422) return 'Something in that form is not right. Please check it and try again.';
   if (status === 403) return 'You are not allowed to do that.';
@@ -40,7 +39,6 @@ export async function api(path, options = {}) {
   let data = null;
   try { data = text ? JSON.parse(text) : null } catch { data = text }
 
-  // Expired / invalid token: clear the session and return to the sign-in screen.
   if (res.status === 401 && token && !path.startsWith('/farmers/login') && !path.startsWith('/farmers/register')) {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(FARMER_KEY);
@@ -119,15 +117,6 @@ export const assistantApi = {
   alerts: (id) => api(`/ai/farmers/${encodeURIComponent(id)}/anomalies`)
 };
 
-Object.assign(marketApi, {
-  createSupplier: (body) => api('/suppliers', { method: 'POST', body: JSON.stringify(body) }),
-  updateSupplier: (id, body) => api(`/suppliers/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-  deleteSupplier: (id) => api(`/suppliers/${id}`, { method: 'DELETE' }),
-  addProduct: (supplierId, body) => api(`/suppliers/${supplierId}/products`, { method: 'POST', body: JSON.stringify(body) }),
-  updateProduct: (id, body) => api(`/suppliers/products/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-  deleteProduct: (id) => api(`/suppliers/products/${id}`, { method: 'DELETE' })
-});
-
 export const chatApi = {
   farmers: () => api('/chat/farmers'),
   conversations: () => api('/chat/conversations'),
@@ -171,7 +160,9 @@ export const exportApi = {
     `/exports/applications/${encodeURIComponent(applicationId)}/consignments/${encodeURIComponent(consignmentId)}`,
     { method: 'PUT', body: JSON.stringify(body) }),
   close: (id, body) => api(`/exports/applications/${encodeURIComponent(id)}/close`,
-    { method: 'PUT', body: JSON.stringify(body) })
+    { method: 'PUT', body: JSON.stringify(body) }),
+  getShipments: (farmerId) => api(`/export/${farmerId}`),
+  createShipment: (farmerId, data) => api(`/export/${farmerId}`, { method: 'POST', body: JSON.stringify(data) })
 };
 
 const authHeader = () => {
@@ -209,4 +200,18 @@ export const farmMarketApi = {
   create: (body) => api('/market/listings', { method: 'POST', body: JSON.stringify(body) }),
   update: (id, body) => api(`/market/listings/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   remove: (id) => api(`/market/listings/${id}`, { method: 'DELETE' })
+};
+
+// --- Compliance (?4) ---
+export const complianceApi = {
+  getChecklist: (farmerId) => api(`/compliance/${farmerId}`),
+  updateCompliance: (farmerId, data) => api(`/compliance/${farmerId}`, { method: 'POST', body: JSON.stringify(data) }),
+  getReminders: (farmerId) => api(`/compliance/${farmerId}/reminders`),
+  regenerateReminders: (farmerId) => api(`/compliance/${farmerId}/reminders/regenerate`, { method: 'POST' }),
+  sendReminder: (farmerId, reminderId) => api(`/compliance/${farmerId}/reminders/${reminderId}/send-now`, { method: 'POST' })
+};
+
+// --- Statement Analysis (?6) ---
+export const statementApi = {
+  analyze: (payload) => api('/finance/statement/analyze', { method: 'POST', body: JSON.stringify(payload) })
 };

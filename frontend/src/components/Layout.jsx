@@ -10,6 +10,7 @@ const nav = [
   ['groups', 'Group Orders', 'users'],
   ['ai', 'Buying Tips', 'spark'],
   ['exports', 'Export Readiness', 'leaf'],
+  ['operations', 'Operations', 'grid'],
   ['notifications', 'Notifications', 'bell'],
   ['chat', 'Chat', 'chat'],
   ['supplier', 'Supplier Portal', 'market']
@@ -83,11 +84,11 @@ export default function Layout({ page, setPage, farmer, onLogout, children, noti
       <main className="main">
         <header className="topbar">
           <div className="topbar-left">
-            <button className="menu-btn" aria-label="Open menu" onClick={() => setOpen(true)}>☰</button>
+            <button className="menu-btn" aria-label="Open menu" onClick={() => setOpen(true)}>???</button>
             <span><span className="live-dot"></span> Online</span>
           </div>
           <div className="top-actions">
-            <span className="location-pill">⌖ {farmer?.location || 'Your location'}</span>
+            <span className="location-pill">??? {farmer?.location || 'Your location'}</span>
             <Avatar id={farmer?.id} name={farmer?.name} size={32} />
           </div>
         </header>
