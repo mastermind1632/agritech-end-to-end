@@ -34,6 +34,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agritech}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE: 10MB
+      SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE: 12MB
       APP_JWT_SECRET: ${APP_JWT_SECRET:-change-this-to-a-long-random-production-secret-at-least-32-chars}
       SPRING_JPA_DDL_AUTO: update
 

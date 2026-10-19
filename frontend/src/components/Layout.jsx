@@ -9,6 +9,7 @@ const nav = [
   ['farmmarket', 'Farm Market', 'market'],
   ['groups', 'Group Orders', 'users'],
   ['ai', 'Buying Tips', 'spark'],
+  ['exports', 'Export Readiness', 'leaf'],
   ['operations', 'Operations', 'grid'],
   ['notifications', 'Notifications', 'bell'],
   ['chat', 'Chat', 'chat'],
@@ -96,4 +97,3 @@ export default function Layout({ page, setPage, farmer, onLogout, children, noti
     </div>
   );
 }
-

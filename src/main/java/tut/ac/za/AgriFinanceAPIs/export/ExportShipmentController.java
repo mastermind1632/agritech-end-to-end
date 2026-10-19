@@ -1,6 +1,9 @@
 package tut.ac.za.AgriFinanceAPIs.export;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import java.util.*;
 
 @RestController
@@ -14,7 +17,8 @@ public class ExportShipmentController {
     }
 
     @GetMapping("/{farmerId}")
-    public Map<String, Object> getFarmerExports(@PathVariable String farmerId) {
+    public Map<String, Object> getFarmerExports(@PathVariable String farmerId, Authentication authentication) {
+        requireOwner(farmerId, authentication);
         List<ExportShipment> shipments = repository.findByFarmerId(farmerId);
         List<Map<String, String>> authorityGuide = List.of(
                 Map.of("authority", "PPECB", "requirement", "Exporter registration, cold-chain protocols, and export inspection booking", "link", "https://ppecb.com"),
@@ -26,8 +30,17 @@ public class ExportShipmentController {
     }
 
     @PostMapping("/{farmerId}")
-    public ExportShipment createShipment(@PathVariable String farmerId, @RequestBody ExportShipment shipment) {
+    public ExportShipment createShipment(@PathVariable String farmerId, @RequestBody ExportShipment shipment,
+                                         Authentication authentication) {
+        requireOwner(farmerId, authentication);
         shipment.setFarmerId(farmerId);
         return repository.save(shipment);
+    }
+
+    private void requireOwner(String farmerId, Authentication authentication) {
+        if (!farmerId.equals(authentication.getName())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "You can only access your own export shipments");
+        }
     }
 }

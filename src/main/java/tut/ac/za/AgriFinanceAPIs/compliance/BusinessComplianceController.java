@@ -1,6 +1,9 @@
 package tut.ac.za.AgriFinanceAPIs.compliance;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -18,7 +21,8 @@ public class BusinessComplianceController {
     }
 
     @GetMapping("/{farmerId}")
-    public Map<String, Object> getComplianceChecklist(@PathVariable String farmerId) {
+    public Map<String, Object> getComplianceChecklist(@PathVariable String farmerId, Authentication authentication) {
+        requireOwner(farmerId, authentication);
         BusinessCompliance compliance = repository.findByFarmerId(farmerId)
                 .orElseGet(() -> {
                     BusinessCompliance bc = new BusinessCompliance();
@@ -47,7 +51,9 @@ public class BusinessComplianceController {
     }
 
     @PostMapping("/{farmerId}")
-    public BusinessCompliance updateCompliance(@PathVariable String farmerId, @RequestBody BusinessCompliance update) {
+    public BusinessCompliance updateCompliance(@PathVariable String farmerId, @RequestBody BusinessCompliance update,
+                                               Authentication authentication) {
+        requireOwner(farmerId, authentication);
         BusinessCompliance compliance = repository.findByFarmerId(farmerId)
                 .orElseGet(() -> {
                     BusinessCompliance bc = new BusinessCompliance();
@@ -70,5 +76,12 @@ public class BusinessComplianceController {
         }
 
         return saved;
+    }
+
+    private void requireOwner(String farmerId, Authentication authentication) {
+        if (!farmerId.equals(authentication.getName())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "You can only access your own compliance details");
+        }
     }
 }

@@ -3,16 +3,16 @@ import { complianceApi, exportApi, statementApi } from '../lib/api';
 
 export default function Operations({ farmer }) {
   const [activeTab, setActiveTab] = useState('compliance');
-  
+
   // Compliance state
   const [compliance, setCompliance] = useState(null);
   const [reminders, setReminders] = useState([]);
   const [compLoading, setCompLoading] = useState(false);
-  
+
   // Export state
   const [shipments, setShipments] = useState([]);
   const [expLoading, setExpLoading] = useState(false);
-  
+
   // Statement state
   const [statementResult, setStatementResult] = useState(null);
   const [stmtLoading, setStmtLoading] = useState(false);
@@ -86,7 +86,7 @@ export default function Operations({ farmer }) {
   return (
     <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
       <h1 style={{ fontSize: '2rem', marginBottom: '2rem' }}>Farm Operations</h1>
-      
+
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid #eaeaea', marginBottom: '2rem' }}>
         {['compliance', 'export', 'statement'].map(tab => (
@@ -114,7 +114,7 @@ export default function Operations({ farmer }) {
                   ))}
                 </ul>
               </div>
-              
+
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <h3 style={{ margin: 0 }}>Upcoming Deadlines</h3>
                 <button onClick={handleRegenerateReminders} style={{ padding: '0.5rem 1rem', cursor: 'pointer' }}>Refresh Schedule</button>
@@ -170,7 +170,7 @@ export default function Operations({ farmer }) {
         <div>
           <h2 style={{ marginBottom: '1rem' }}>Expense Statement Analysis</h2>
           <p style={{ color: '#666', marginBottom: '1.5rem' }}>Simulate uploading a bank statement to check balance validity and categorise farm expenses.</p>
-          
+
           <form onSubmit={handleAnalyzeStatement} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '500px', marginBottom: '2rem' }}>
             <label>Opening Balance: <input name="opening" type="number" defaultValue="10000" style={{ width: '100%', padding: '0.5rem' }} /></label>
             <label>Closing Balance: <input name="closing" type="number" defaultValue="8500" style={{ width: '100%', padding: '0.5rem' }} /></label>
@@ -192,7 +192,7 @@ export default function Operations({ farmer }) {
               <h3 style={{ marginTop: 0 }}>Analysis Result: {statementResult.status}</h3>
               <p><strong>Balance Valid:</strong> {statementResult.balanceValid ? '? Yes' : '? No'}</p>
               <p><strong>Expected Closing:</strong> R {statementResult.expectedClosingBalance}</p>
-              
+
               <h4>Categorised Totals:</h4>
               <ul>
                 {Object.entries(statementResult.categoryTotals).map(([cat, amt]) => (

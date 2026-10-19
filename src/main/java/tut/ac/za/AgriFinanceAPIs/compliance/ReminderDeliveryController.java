@@ -2,6 +2,7 @@ package tut.ac.za.AgriFinanceAPIs.compliance;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import tut.ac.za.AgriFinanceAPIs.compliance.delivery.ReminderDeliveryService;
@@ -23,7 +24,9 @@ public class ReminderDeliveryController {
 
     @PostMapping("/{farmerId}/reminders/{reminderId}/send-now")
     public ResponseEntity<Map<String, Object>> sendNow(@PathVariable String farmerId,
-                                                       @PathVariable Long reminderId) {
+                                                       @PathVariable Long reminderId,
+                                                       Authentication authentication) {
+        requireOwner(farmerId, authentication);
         ComplianceReminder r = reminders.findById(reminderId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Reminder not found: " + reminderId));
@@ -42,5 +45,12 @@ public class ReminderDeliveryController {
                 "delivered", ok,
                 "sent", r.isSent()
         ));
+    }
+
+    private void requireOwner(String farmerId, Authentication authentication) {
+        if (!farmerId.equals(authentication.getName())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "You can only send reminders for your own farm");
+        }
     }
 }
