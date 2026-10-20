@@ -1,0 +1,161 @@
+# Business Companion: workflow definition
+# One entry per step, in order. A step stays locked until every step in
+# needsFirst is done. Edit this file, not the PDF, when a step changes.
+#
+# lastVerified: leave as null until someone has opened the link and checked
+# it. Then set a date, for example "2026-10-20".
+
+version: "1.1.0"
+branch: "feature/business-companion"
+lastVerified: null
+description: "Step-by-step formalisation workflow for the Business Companion module. Links are unverified until lastVerified is set on each source."
+
+steps:
+
+  - stepNumber: 1
+    title: "Business plan"
+    needsFirst: []
+    proposed: false   # true = from the Agritech guide, not the mentor's list
+    toConfirm: false
+    condition: null
+    whereToDoIt: "In the app"
+    aiAssistance: "Explains what a business plan is and helps draft one so the user adjusts numbers instead of starting blank."
+    officialSource:
+      name: "Internal platform tool"
+      url: null
+      lastVerified: null
+
+  - stepNumber: 2
+    title: "Choose a structure (sole proprietor, (Pty) Ltd or co-operative)"
+    needsFirst: [1]
+    proposed: true   # true = from the Agritech guide, not the mentor's list
+    toConfirm: false
+    condition: null
+    whereToDoIt: "In-app guidance; accountant for advice"
+    aiAssistance: "Explains the options in plain words, covering liability, tax and funding eligibility."
+    officialSource:
+      name: "SAICA (find an accountant)"
+      url: "https://www.saica.org.za"
+      lastVerified: null
+
+  - stepNumber: 3
+    title: "Choose a business name"
+    needsFirst: [2]
+    proposed: false   # true = from the Agritech guide, not the mentor's list
+    toConfirm: false
+    condition: null
+    whereToDoIt: "In the app"
+    aiAssistance: "Generates business name ideas."
+    officialSource:
+      name: "Internal name generator"
+      url: null
+      lastVerified: null
+
+  - stepNumber: 4
+    title: "Apply for / reserve the name"
+    needsFirst: [3]
+    proposed: false   # true = from the Agritech guide, not the mentor's list
+    toConfirm: false
+    condition: null
+    whereToDoIt: "BizPortal / CIPC"
+    aiAssistance: "Explains step by step how to reserve a name with CIPC."
+    officialSource:
+      name: "BizPortal"
+      url: "https://www.bizportal.gov.za"
+      lastVerified: null
+
+  - stepNumber: 5
+    title: "Register the business"
+    needsFirst: [4]
+    proposed: false   # true = from the Agritech guide, not the mentor's list
+    toConfirm: false
+    condition: null
+    whereToDoIt: "BizPortal / CIPC"
+    aiAssistance: "Answers questions the user does not understand during registration."
+    officialSource:
+      name: "CIPC"
+      url: "https://www.cipc.co.za"
+      lastVerified: null
+
+  - stepNumber: 6
+    title: "Register for tax"
+    needsFirst: [5]
+    proposed: true   # true = from the Agritech guide, not the mentor's list
+    toConfirm: false
+    condition: null
+    whereToDoIt: "SARS / eFiling"
+    aiAssistance: "Explains income tax and VAT basics, says to check SARS for the current VAT threshold, and suggests an accountant."
+    officialSource:
+      name: "SARS eFiling"
+      url: "https://www.sarsefiling.co.za"
+      lastVerified: null
+
+  # TO CONFIRM: the mentor has not said which certificates this step covers.
+  # Do not build it until he answers.
+  - stepNumber: 7
+    title: "Occupational and health certificates / permits"
+    needsFirst: [5]
+    proposed: false   # true = from the Agritech guide, not the mentor's list
+    toConfirm: true
+    condition: null
+    whereToDoIt: "To be confirmed. Closest items from the guide: Dept. of Water and Sanitation, local municipality, GLOBALG.A.P."
+    aiAssistance: "Explains what they are and where to get them, once the mentor confirms which certificates are meant."
+    officialSource:
+      name: "To be confirmed"
+      url: null
+      lastVerified: null
+    note: "Mentor has not yet said which certificates this step covers. Do not build until confirmed."
+
+  - stepNumber: 8
+    title: "Business bank account"
+    needsFirst: [5, 6]
+    proposed: false   # true = from the Agritech guide, not the mentor's list
+    toConfirm: false
+    condition: null
+    whereToDoIt: "Commercial banks"
+    aiAssistance: "Explains what documents to bring and points to places to go."
+    officialSource:
+      name: "Commercial banks"
+      url: null
+      lastVerified: null
+
+  # Only shown when the farm has employees (condition: hasEmployees).
+  - stepNumber: 9
+    title: "Employee registrations (UIF, COIDA)"
+    needsFirst: [6]
+    proposed: true   # true = from the Agritech guide, not the mentor's list
+    toConfirm: false
+    condition: "hasEmployees"
+    whereToDoIt: "Dept. of Employment and Labour / uFiling"
+    aiAssistance: "Explains UIF and COIDA requirements."
+    officialSource:
+      name: "uFiling"
+      url: "https://www.ufiling.co.za"
+      lastVerified: null
+
+  - stepNumber: 10
+    title: "Keep records"
+    needsFirst: [8]
+    proposed: true   # true = from the Agritech guide, not the mentor's list
+    toConfirm: false
+    condition: null
+    whereToDoIt: "In the app"
+    aiAssistance: "Explains what to keep (invoices, statements, payroll, spray records) and for how long (SARS generally requires five years)."
+    officialSource:
+      name: "SARS"
+      url: "https://www.sars.gov.za"
+      lastVerified: null
+
+  - stepNumber: 11
+    title: "Apply for funding"
+    needsFirst: [1, 5, 8, 10]
+    proposed: true   # true = from the Agritech guide, not the mentor's list
+    toConfirm: false
+    condition: null
+    whereToDoIt: "Land Bank, NEF, SEDFA"
+    aiAssistance: "Points to funders and explains what documents they ask for."
+    officialSource:
+      name: "SEDFA"
+      url: "https://www.sedfa.org.za"
+      lastVerified: null
+      
