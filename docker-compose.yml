@@ -37,6 +37,13 @@ services:
       APP_SMS_PROVIDER: ${APP_SMS_PROVIDER:-mock}
       APP_WHATSAPP_PHONE_ID: ${APP_WHATSAPP_PHONE_ID:-}
       APP_WHATSAPP_TOKEN: ${APP_WHATSAPP_TOKEN:-}
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_AUTH: ${MAIL_AUTH:-true}
+      MAIL_TLS: ${MAIL_TLS:-true}
+      APP_EMAIL_FROM: ${APP_EMAIL_FROM:-noreply@agritech.local}
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agritech}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -57,6 +64,7 @@ services:
 volumes:
   postgres_data:
   vault_data:
+
 
 
 
