@@ -646,7 +646,7 @@ export default function ExportReadiness() {
         <div>
           <p className="eyebrow">EXPORT READINESS</p>
           <h1>Prepare your export</h1>
-          <p className="muted">Track your export preparation, requirements and supporting records. AgriTech does not issue official export approvals, and uploaded documents are not officially verified.</p>
+          <p className="muted">Track your export journey from preparation to shipment. Follow key requirements, monitor your progress, and keep all your supporting documents organised in one place.</p>
         </div>
         <button className="primary" type="button" onClick={startNew}>＋ New application</button>
       </div>
