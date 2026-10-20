@@ -1,0 +1,14 @@
+services:
+  companion-mongo:
+    image: mongo:7
+    container_name: companion-mongo
+    ports:
+      - "127.0.0.1:27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${COMPANION_MONGO_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${COMPANION_MONGO_PASSWORD}
+    volumes:
+      - companion-mongo-data:/data/db
+
+volumes:
+  companion-mongo-data:
