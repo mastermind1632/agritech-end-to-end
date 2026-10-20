@@ -229,4 +229,39 @@ export const statementApi = {
   }
 };
 
+export const vaultApi = {
+  upload: async (file, docType, notes, expiresAt) => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('docType', docType);
+    if (notes) fd.append('notes', notes);
+    if (expiresAt) fd.append('expiresAt', expiresAt);
+    const res = await fetch(`${API}/vault/upload`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: fd
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || data.detail || 'Upload failed');
+    return data;
+  },
+  list: (farmerId) => api(`/vault/${encodeURIComponent(farmerId)}`),
+  download: async (id) => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const res = await fetch(`${API}/vault/${encodeURIComponent(id)}/download`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    if (!res.ok) throw new Error('Download failed');
+    return res.blob();
+  },
+  delete: (id) => api(`/vault/${encodeURIComponent(id)}`, { method: 'DELETE' })
+};
 
+export const consentApi = {
+  get: (farmerId) => api(`/consent/${encodeURIComponent(farmerId)}`),
+  record: (farmerId, type, granted) => api(`/consent/${encodeURIComponent(farmerId)}`, {
+    method: 'POST', body: JSON.stringify({ type, granted, version: 'v1.0' })
+  }),
+  check: (farmerId, type) => api(`/consent/${encodeURIComponent(farmerId)}/check?type=${encodeURIComponent(type)}`)
+};
