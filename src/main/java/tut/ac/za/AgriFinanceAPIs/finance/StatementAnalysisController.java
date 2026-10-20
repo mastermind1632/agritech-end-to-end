@@ -68,13 +68,14 @@ public class StatementAnalysisController {
 
         String json;
         try {
-            String uri = password != null && !password.isBlank()
-                    ? "/api/ocr/extract?password=" + java.net.URLEncoder.encode(password, java.nio.charset.StandardCharsets.UTF_8)
-                    : "/api/ocr/extract";
-            json = ocr.post()
-                    .uri(uri)
+            var requestSpec = ocr.post()
+                    .uri("/api/ocr/extract")
                     .header(HttpHeaders.AUTHORIZATION, bearer)
-                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .contentType(MediaType.MULTIPART_FORM_DATA);
+            if (password != null && !password.isBlank()) {
+                requestSpec = requestSpec.header("X-PDF-Password", password);
+            }
+            json = requestSpec
                     .body(body)
                     .retrieve()
                     .body(String.class);
@@ -189,6 +190,7 @@ public class StatementAnalysisController {
         return "General farm expense";
     }
 }
+
 
 
 
