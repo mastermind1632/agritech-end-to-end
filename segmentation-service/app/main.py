@@ -175,7 +175,7 @@ def demand(owner=Depends(identity)):
 
 
 @app.post("/api/ocr/extract")
-async def ocr_extract(file: UploadFile = File(...), owner=Depends(identity)):
+async def ocr_extract(file: UploadFile = File(...), password: str | None = None, owner=Depends(identity)):
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(422, "Only PDF files are supported for extraction at this time.")
     contents = await file.read()
@@ -184,7 +184,7 @@ async def ocr_extract(file: UploadFile = File(...), owner=Depends(identity)):
     
     try:
         import asyncio
-        result = await asyncio.to_thread(extract_statement, contents, file.filename)
+        result = await asyncio.to_thread(extract_statement, contents, file.filename, password)
         return result
     except ValueError as e:
         raise HTTPException(422, str(e))
@@ -194,4 +194,5 @@ async def ocr_extract(file: UploadFile = File(...), owner=Depends(identity)):
         import traceback
         traceback.print_exc()
         raise HTTPException(500, f"OCR processing error: {type(e).__name__}: {str(e)}")
+
 

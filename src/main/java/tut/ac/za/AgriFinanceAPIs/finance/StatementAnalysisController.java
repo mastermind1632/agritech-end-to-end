@@ -47,6 +47,7 @@ public class StatementAnalysisController {
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Map<String, Object>> uploadAndAnalyze(
             @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "password", required = false) String password,
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String bearer) throws IOException {
 
         if (file.isEmpty()) {
@@ -67,8 +68,11 @@ public class StatementAnalysisController {
 
         String json;
         try {
+            String uri = password != null && !password.isBlank()
+                    ? "/api/ocr/extract?password=" + java.net.URLEncoder.encode(password, java.nio.charset.StandardCharsets.UTF_8)
+                    : "/api/ocr/extract";
             json = ocr.post()
-                    .uri("/api/ocr/extract")
+                    .uri(uri)
                     .header(HttpHeaders.AUTHORIZATION, bearer)
                     .contentType(MediaType.MULTIPART_FORM_DATA)
                     .body(body)
@@ -185,4 +189,6 @@ public class StatementAnalysisController {
         return "General farm expense";
     }
 }
+
+
 

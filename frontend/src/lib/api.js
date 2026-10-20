@@ -214,10 +214,11 @@ export const complianceApi = {
 // --- Statement Analysis (?6) ---
 export const statementApi = {
   analyze: (payload) => api('/finance/statement/analyze', { method: 'POST', body: JSON.stringify(payload) }),
-  uploadAndAnalyze: async (file) => {
+  uploadAndAnalyze: async (file, password) => {
     const token = localStorage.getItem(TOKEN_KEY);
     const fd = new FormData();
     fd.append('file', file);
+    if (password) fd.append('password', password);
     const res = await fetch(`${API}/finance/statement/upload`, {
       method: 'POST',
       headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -265,3 +266,4 @@ export const consentApi = {
   }),
   check: (farmerId, type) => api(`/consent/${encodeURIComponent(farmerId)}/check?type=${encodeURIComponent(type)}`)
 };
+

@@ -13,6 +13,7 @@ export default function Operations({ farmer, setPage }) {
   const [statementResult, setStatementResult] = useState(null);
   const [stmtLoading, setStmtLoading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
+  const [pdfPassword, setPdfPassword] = useState('');
 
   useEffect(() => {
     if (activeTab === 'compliance') loadCompliance();
@@ -77,7 +78,7 @@ export default function Operations({ farmer, setPage }) {
       return;
     }
     try {
-      const res = await statementApi.uploadAndAnalyze(file);
+      const res = await statementApi.uploadAndAnalyze(file, pdfPassword);
       setStatementResult(res);
     } catch (err) {
       setUploadError(err.message || "Upload failed");
@@ -156,9 +157,19 @@ export default function Operations({ farmer, setPage }) {
           <div style={{ padding: '1.5rem', background: '#f9f9f9', borderRadius: '8px', marginBottom: '2rem' }}>
             <h3 style={{ marginTop: 0 }}>Option 1: Upload a PDF bank statement</h3>
             <p style={{ color: '#666', marginBottom: '1rem' }}>We'll extract transactions, validate the opening/closing balance, and categorise every line.</p>
-            <form onSubmit={handlePdfUpload} style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <input name="pdf" type="file" accept="application/pdf" style={{ flex: 1 }} />
-              <button type="submit" disabled={stmtLoading} style={{ padding: '0.75rem 1.5rem', background: '#2f5d50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+            <form onSubmit={handlePdfUpload} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '500px' }}>
+              <input name="pdf" type="file" accept="application/pdf" style={{ width: '100%' }} />
+              <label>
+                PDF password (if protected)
+                <input
+                  type="password"
+                  value={pdfPassword}
+                  onChange={e => setPdfPassword(e.target.value)}
+                  placeholder="Usually your ID number or account number"
+                  style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
+                />
+              </label>
+              <button type="submit" disabled={stmtLoading} style={{ padding: '0.75rem 1.5rem', background: '#2f5d50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', alignSelf: 'flex-start' }}>
                 {stmtLoading ? 'Processing...' : 'Upload & Analyse'}
               </button>
             </form>
@@ -202,3 +213,5 @@ export default function Operations({ farmer, setPage }) {
     </div>
   );
 }
+
+
