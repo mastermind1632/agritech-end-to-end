@@ -29,6 +29,7 @@ jobs:
     needs: [test, langchain-test, segmentation-test, certificate-test, document-test, migrations-test, frontend-build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: read
       packages: write

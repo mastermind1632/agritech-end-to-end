@@ -1,5 +1,5 @@
 # ---- Backend build ----
-FROM maven:3.9-eclipse-temurin-21 AS backend-build
+FROM --platform=$BUILDPLATFORM maven:3.9-eclipse-temurin-21 AS backend-build
 WORKDIR /build
 COPY pom.xml .
 COPY src ./src
