@@ -1,1 +1,34 @@
-<!doctype html><html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="theme-color" content="#0d5c45"/><title>AgriTech</title></head><body><div id="root"></div><script type="module" src="/src/main.jsx"></script></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0d5c45" />
+    <meta name="description" content="AgriTech: a farm business platform for South African farmers. Farm Market, Business Builder, Expense Analysis, Export Readiness and Market Insights." />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="AgriTech" />
+    <title>AgriTech</title>
+    <script>
+      // Apply the saved theme and text size before the first paint, so dark-theme users never see a white flash.
+      (function () {
+        try {
+          var t = localStorage.getItem('agritech_theme') || 'system';
+          var dark = t === 'dark' || (t === 'system' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+          var r = document.documentElement;
+          r.setAttribute('data-theme', dark ? 'dark' : 'light');
+          r.setAttribute('data-text', localStorage.getItem('agritech_text_size') || 'normal');
+          r.style.colorScheme = dark ? 'dark' : 'light';
+          r.lang = localStorage.getItem('agritech_lang') || 'en';
+          if (dark) document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0b1a15');
+        } catch (e) { /* storage blocked: light theme */ }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

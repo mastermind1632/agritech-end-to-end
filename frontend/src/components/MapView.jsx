@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { tr } from '../lib/i18n';
 
 const SOUTH_AFRICA = [-28.5, 25.0];
 const TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
@@ -41,7 +42,7 @@ export function ListingMap({ listings, me, selectedId, onSelect, height = 380 })
     });
     if (me) {
       L.circleMarker([me.lat, me.lng], { radius: 8, color: '#1d4ed8', weight: 3, fillColor: '#3b82f6', fillOpacity: 1 })
-        .addTo(layer.current).bindTooltip('You are here');
+        .addTo(layer.current).bindTooltip(tr('You are here'));
     }
   }, [listings, me, selectedId]);
 

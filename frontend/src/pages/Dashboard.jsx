@@ -1,396 +1,270 @@
 import { useEffect, useState } from 'react';
 import StatCard from '../components/StatCard';
-import { financeApi, groupApi, recommendationApi } from '../lib/api';
+import { BarChart, Progress, ProgressRing } from '../components/Charts';
+import { SkeletonLines } from '../components/Skeleton';
+import EmptyState from '../components/EmptyState';
+import Badge from '../components/Badge';
+import { farmMarketApi, financeApi, groupApi, insightsApi, adminApi } from '../lib/api';
+import { compactMoney, date, money } from '../lib/format';
+import { describe, farmingHint, forecastFor } from '../lib/weather';
+import useLang from '../hooks/useLang';
+import { weekdayShort } from '../lib/i18n';
 
-const money = (n) =>
-  new Intl.NumberFormat('en-ZA', {
-    style: 'currency',
-    currency: 'ZAR',
-    maximumFractionDigits: 0
-  }).format(Number(n || 0));
+function NextSteps({ steps, setPage, loading }) {
+  const { t } = useLang();
+  return (
+    <section className="panel">
+      <div className="panel-head"><div><p className="eyebrow">{t('JUST FOR YOU')}</p><h2>{t('nextSteps')}</h2></div></div>
+      {loading ? <SkeletonLines lines={4} /> : !steps?.length ? (
+        <EmptyState icon="✓" title={t('allCaughtUp')} text="New tasks from orders, deadlines and your statements will appear here." />
+      ) : steps.slice(0, 6).map((s) => (
+        <button key={s.id} className={`step-row ${s.priority}`} onClick={() => setPage(s.page)}>
+          <span className="step-dot" />
+          <div><b>{t(s.title)}</b><p>{t(s.text)}</p></div>
+          <span className="step-go">→</span>
+        </button>
+      ))}
+    </section>
+  );
+}
+
+function Weather({ place }) {
+  const { t } = useLang();
+  const [w, setW] = useState(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let live = true;
+    forecastFor(place).then((d) => live && setW(d)).catch(() => live && setError(t('The forecast is not available right now. Check your signal and try again later.')));
+    return () => { live = false; };
+  }, [place]);
+  return (
+    <section className="panel weather">
+      <div className="panel-head"><div><p className="eyebrow">{t('weather').toUpperCase()}</p><h2>{w?.place || place || t('Your farm')}</h2></div>
+        {w && <span className="weather-now">{describe(w.current?.weather_code)[1]} {Math.round(w.current?.temperature_2m)}°C</span>}</div>
+      {error ? <p className="muted">{error}</p> : !w ? <SkeletonLines lines={3} /> : (
+        <>
+          <div className="weather-days">
+            {w.daily.time.map((d, i) => (
+              <div key={d}>
+                <span>{i === 0 ? t('Today') : weekdayShort(d)}</span>
+                <b title={describe(w.daily.weather_code[i])[0]}>{describe(w.daily.weather_code[i])[1]}</b>
+                <span>{Math.round(w.daily.temperature_2m_max[i])}° / {Math.round(w.daily.temperature_2m_min[i])}°</span>
+                <small>{w.daily.precipitation_probability_max?.[i] ?? 0}% · {Math.round(w.daily.precipitation_sum[i] || 0)} mm</small>
+              </div>
+            ))}
+          </div>
+          <p className="weather-hint">{farmingHint(w.daily)}</p>
+          <p className="source-note">{t('Forecast: Open-Meteo')}</p>
+        </>
+      )}
+    </section>
+  );
+}
+
+function PriceBoard({ setPage }) {
+  const { t } = useLang();
+  const [rows, setRows] = useState(null);
+  useEffect(() => { farmMarketApi.prices(8).then(setRows).catch(() => setRows([])); }, []);
+  return (
+    <section className="panel">
+      <div className="panel-head"><div><p className="eyebrow">{t('prices').toUpperCase()}</p><h2>{t('Prices on Farm Market')}</h2></div>
+        <button className="text-button" onClick={() => setPage('farmmarket')}>{t('Browse →')}</button></div>
+      {rows === null ? <SkeletonLines lines={4} /> : !rows.length ? (
+        <EmptyState icon="▤" title="No prices yet" text="Prices appear as farmers list produce." action="List produce" onAction={() => setPage('farmmarket')} />
+      ) : (
+        <div className="table-wrap"><table>
+          <thead><tr><th>{t('Product')}</th><th className="right">{t('Asking')}</th><th className="right">{t('Range')}</th><th className="right">{t('Sold (90 days)')}</th></tr></thead>
+          <tbody>{rows.map((r) => (
+            <tr key={r.product + r.unit}>
+              <td><b>{t(r.product)}</b> <span className="muted">/ {t(r.unit)}</span></td>
+              <td className="right">{money(r.averageAsking)}</td>
+              <td className="right muted">{money(r.lowest)} – {money(r.highest)}</td>
+              <td className="right">{r.averageSold ? `${money(r.averageSold)} (${r.sales})` : '—'}</td>
+            </tr>))}
+          </tbody>
+        </table></div>
+      )}
+    </section>
+  );
+}
+
+function ModuleTiles({ o, setPage }) {
+  const { t } = useLang();
+  const c = o?.companion;
+  const ex = o?.exports || {};
+  const st = o?.statements || {};
+  const mk = o?.marketplace || {};
+  return (
+    <div className="module-grid">
+      <button className="module-tile" onClick={() => setPage('companion')}>
+        <ProgressRing value={c?.percent || 0} size={64} />
+        <div><b>{t('Business Builder')}</b>
+          <span>{!c?.intakeCompleted ? t('Answer 10 questions to start') : t('{done} of {total} steps done', { done: c.done, total: c.applicable })}</span>
+          {c?.verified && <Badge tone="good">Verified business</Badge>}
+          {c?.nextDeadline && <small>{t('Next:')} {t(c.nextDeadline.title)} · {date(c.nextDeadline.dueDate)}</small>}
+        </div>
+      </button>
+      <button className="module-tile" onClick={() => setPage('statements')}>
+        <span className="tile-icon">≣</span>
+        <div><b>{t('Expense Analysis')}</b>
+          <span>{st.statements ? t(st.statements > 1 ? '{n} statements analysed' : '{n} statement analysed', { n: st.statements }) : t('Upload a bank statement')}</span>
+          {st.needsReview > 0 && <Badge tone="warn">{t('{n} to review', { n: st.needsReview })}</Badge>}
+          {st.latestPeriodEnd && <small>{t('Up to {date}', { date: date(st.latestPeriodEnd) })}</small>}
+        </div>
+      </button>
+      <button className="module-tile" onClick={() => setPage('export')}>
+        <ProgressRing value={ex.bestReadiness || 0} size={64} color="var(--gold)" />
+        <div><b>{t('Export Readiness')}</b>
+          <span>{ex.activePlans ? t(ex.activePlans > 1 ? '{n} active plans' : '{n} active plan', { n: ex.activePlans }) : t('Check a product and market')}</span>
+          {ex.exportReady && <Badge tone="good">Export-ready</Badge>}
+        </div>
+      </button>
+      <button className="module-tile" onClick={() => setPage('farmmarket')}>
+        <span className="tile-icon">⛟</span>
+        <div><b>{t('Farm Market')}</b>
+          <span>{t(mk.activeListings === 1 ? '{n} active listing' : '{n} active listings', { n: mk.activeListings || 0 })} · {t('{n} sales', { n: mk.completedSales || 0 })}</span>
+          {mk.ordersToAnswer > 0 && <Badge tone="bad">{t(mk.ordersToAnswer > 1 ? '{n} orders waiting' : '{n} order waiting', { n: mk.ordersToAnswer })}</Badge>}
+        </div>
+      </button>
+    </div>
+  );
+}
+
+function AdminStrip({ setPage }) {
+  const { t } = useLang();
+  const [s, setS] = useState(null);
+  useEffect(() => { adminApi.stats().then(setS).catch(() => {}); }, []);
+  if (!s) return null;
+  return (
+    <section className="panel admin-strip">
+      <div className="panel-head"><div><p className="eyebrow">{t('PLATFORM')}</p><h2>{t('Today on the platform')}</h2></div>
+        <button className="text-button" onClick={() => setPage('admin')}>{t('Open admin console →')}</button></div>
+      <div className="summary-grid">
+        <div><span>{t('Users')}</span><strong>{s.totalUsers}</strong></div>
+        <div><span>{t('Active listings')}</span><strong>{s.activeListings}</strong></div>
+        <div><span>{t('Completed sales')}</span><strong>{compactMoney(s.completedSalesValue)}</strong></div>
+        <div><span>{t('Open disputes')}</span><strong>{s.openDisputes}</strong></div>
+        <div><span>{t('Verifications waiting')}</span><strong>{s.pendingVerifications}</strong></div>
+        <div><span>{t('Content to review')}</span><strong>{s.pendingContentChanges}</strong></div>
+      </div>
+    </section>
+  );
+}
 
 export default function Dashboard({ farmer, setPage }) {
+  const { t } = useLang();
+  const role = farmer.role || 'FARMER';
+  const isFarmer = role === 'FARMER' || role === 'ADMIN';
+  const [overview, setOverview] = useState(null);
+  const [months, setMonths] = useState([]);
   const [summary, setSummary] = useState(null);
   const [groups, setGroups] = useState([]);
-  const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    let mounted = true;
-
-    async function loadDashboard() {
-      setLoading(true);
-      setError('');
-
+    let live = true;
+    (async () => {
+      setLoading(true); setError('');
       try {
-        const [finance, openGroups, recs] = await Promise.all([
-          financeApi.summary(farmer.id),
-          groupApi.list('open'),
-          recommendationApi.list(farmer.id)
-        ]);
-
-        if (!mounted) return;
-
-        setSummary(finance);
-        setGroups(openGroups || []);
-        setRecommendations(recs || []);
-      } catch (err) {
-        if (mounted) {
-          setError(err.message || 'Unable to load dashboard data.');
+        const [o, g] = await Promise.all([insightsApi.overview(), groupApi.list('open').catch(() => [])]);
+        if (!live) return;
+        setOverview(o); setGroups(g || []);
+        if (isFarmer) {
+          const [m, s] = await Promise.all([financeApi.monthly(6), financeApi.summary(farmer.id)]);
+          if (live) { setMonths(m || []); setSummary(s); }
         }
+      } catch (e) {
+        if (live) setError(e.message || t('Unable to load your overview.'));
       } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+        if (live) setLoading(false);
       }
-    }
-
-    loadDashboard();
-
-    return () => {
-      mounted = false;
-    };
-  }, [farmer.id]);
+    })();
+    return () => { live = false; };
+  }, [farmer.id, isFarmer]);
 
   const income = Number(summary?.totalIncome || 0);
   const expenses = Number(summary?.totalExpenses || 0);
-  const netPosition = income - expenses;
+  const last3 = months.slice(-3).reduce((a, m) => a + Number(m.net || 0), 0);
+  const seg = overview?.segment;
 
   return (
     <>
       <div className="page-head">
         <div>
-          <p className="eyebrow">YOUR FARM TODAY</p>
-
-          <h1>
-            Good day, {farmer.name?.split(' ')[0] || 'Farmer'}.
-          </h1>
-
-          <p className="muted">
-            Here is how your farm is doing.
-          </p>
+          <p className="eyebrow">{t('YOUR FARM TODAY')}</p>
+          <h1>{t('goodDay')}, {farmer.name?.split(' ')[0] || t('Farmer')}.</h1>
+          <p className="muted">{seg ? <>{t('You are in the')} <b>{t(seg.name)}</b> {t('group.')} {t(seg.description)}</> : t('Here is how your farm is doing.')}</p>
         </div>
-
         <div className="head-actions">
-          <button
-            className="secondary"
-            onClick={() => setPage('ai')}
-          >
-            See my buying tips
-          </button>
-
-          <button
-            className="primary"
-            onClick={() => setPage('finance')}
-          >
-            + Record transaction
-          </button>
+          {isFarmer && <button className="secondary" onClick={() => setPage('statements')}>{t('Upload statement')}</button>}
+          {isFarmer ? <button className="primary" onClick={() => setPage('finance')}>{t('+ Record transaction')}</button>
+            : <button className="primary" onClick={() => setPage('farmmarket')}>{t('Browse produce')}</button>}
         </div>
       </div>
 
-      {error && (
-        <div className="notice error">
-          <strong>Dashboard unavailable:</strong> {error}
-        </div>
+      {error && <div className="error page-error">{error}</div>}
+
+      {isFarmer && (
+        <section className="stats">
+          <StatCard label="Total income" value={loading ? '…' : money(income, 0)} sub="All recorded sales" icon="arrow" positive />
+          <StatCard label="Total expenses" value={loading ? '…' : money(expenses, 0)} sub="All recorded costs" icon="wallet" />
+          <StatCard label="Net, last 3 months" value={loading ? '…' : money(last3, 0)} sub="Income minus expenses" icon="leaf" positive={last3 >= 0} />
+          <StatCard label="Open group orders" value={loading ? '…' : groups.length} sub="Buy inputs together" icon="users" />
+        </section>
       )}
 
-      <section className="stats">
+      {role === 'ADMIN' && <div className="dash-section"><AdminStrip setPage={setPage} /></div>}
 
-        <StatCard
-          label="Total income"
-          value={loading ? 'Loading...' : money(income)}
-          sub="Sales you added"
-          icon="arrow"
-          positive
-        />
-
-        <StatCard
-          label="Total expenses"
-          value={loading ? 'Loading...' : money(expenses)}
-          sub="Costs you added"
-          icon="wallet"
-        />
-
-        <StatCard
-          label="Net position"
-          value={loading ? 'Loading...' : money(netPosition)}
-          sub="Income minus expenses"
-          icon="leaf"
-          positive={netPosition >= 0}
-        />
-
-        <StatCard
-          label="Open group orders"
-          value={loading ? '...' : groups.length}
-          sub="Available opportunities"
-          icon="users"
-        />
-
-      </section>
+      {isFarmer && <div className="dash-section"><ModuleTiles o={overview} setPage={setPage} /></div>}
 
       <div className="dashboard-grid">
-
-        {/* MAIN COMMAND PANEL */}
-        <section className="panel hero-panel">
-
-          <div className="panel-head">
-            <div>
-              <p className="eyebrow">FARM OVERVIEW</p>
-              <h2>Your farm, in one view.</h2>
-            </div>
-
-            <span className="tag">
-              {loading ? 'LOADING' : 'UP TO DATE'}
-            </span>
-          </div>
-
-          <div className="insight-banner">
-
-            <div className="insight-icon">
-              ✦
-            </div>
-
-            <div>
-              <b>Save money by buying together</b>
-
-              <p>
-                Explore open orders and compare listed prices.
-                Purchase matches use your recorded activity;
-                supplier terms still need confirmation.
-              </p>
-            </div>
-
-            <button onClick={() => setPage('ai')}>
-              See my tips →
-            </button>
-
-          </div>
-
-          <div className="quick-grid">
-
-            <button onClick={() => setPage('finance')}>
-              <b>Track finances</b>
-              <span>Add income or expenses</span>
-            </button>
-
-            <button onClick={() => setPage('market')}>
-              <b>Compare suppliers</b>
-              <span>Browse available products</span>
-            </button>
-
-            <button onClick={() => setPage('groups')}>
-              <b>Join a group</b>
-              <span>Unlock bulk discounts</span>
-            </button>
-
-          </div>
-
-        </section>
-
-        {/* AI RECOMMENDATIONS */}
-        <section className="panel">
-
-          <div className="panel-head">
-            <div>
-              <p className="eyebrow">JUST FOR YOU</p>
-              <h2>Buying tips</h2>
-            </div>
-
-            <button
-              className="text-button"
-              onClick={() => setPage('ai')}
-            >
-              View all
-            </button>
-          </div>
-
-          {loading && (
-            <>
-              <div className="list-row">
-                <span className="round-icon">✦</span>
-                <div>
-                  <b>Looking at your spending...</b>
-                  <p>
-                    Finding products that could cost you less.
-                  </p>
-                </div>
-              </div>
-
-              <div className="list-row">
-                <span className="round-icon">✦</span>
-                <div>
-                  <b>Getting your tips ready...</b>
-                  <p>
-                    This only takes a moment.
-                  </p>
-                </div>
-              </div>
-            </>
+        <div className="stack">
+          {isFarmer && (
+            <section className="panel">
+              <div className="panel-head"><div><p className="eyebrow">{t('CASH FLOW')}</p><h2>{t('Income and expenses, last 6 months')}</h2></div>
+                <button className="text-button" onClick={() => setPage('finance')}>{t('Details →')}</button></div>
+              {loading ? <SkeletonLines lines={5} /> : months.some((m) => Number(m.income) || Number(m.expenses)) ? (
+                <BarChart rows={months} series={[{ key: 'income', label: 'Income', color: '#3d9d6c' }, { key: 'expenses', label: 'Expenses', color: '#c98a3a' }]} />
+              ) : <EmptyState icon="▥" title="No transactions yet" text="Record a sale or expense, or upload a bank statement, to see your cash flow." action="Upload statement" onAction={() => setPage('statements')} />}
+            </section>
           )}
-
-          {!loading &&
-            recommendations.slice(0, 3).map((recommendation, index) => (
-              <div
-                className="list-row"
-                key={recommendation.id || index}
-              >
-                <span className="round-icon">
-                  ✦
-                </span>
-
-                <div>
-                  <b>{recommendation.productName || 'Buying opportunity'}</b>
-
-                  <p>
-                    {recommendation.reason ||
-                      'You could save by joining a group order for this product.'}
-                  </p>
-                </div>
-              </div>
-            ))}
-
-          {!loading && !recommendations.length && (
-            <div className="empty">
-
-              <span>✦</span>
-
-              <b>
-                No buying tips yet
-              </b>
-
-              <p>
-                No available group-buying opportunities right now.
-              </p>
-
-              <button
-                className="secondary"
-                onClick={() => setPage('ai')}
-              >
-                Open Buying Tips
-              </button>
-
-            </div>
-          )}
-
-        </section>
-
-      </div>
-
-      {/* GROUP PURCHASING */}
-      <section className="panel table-panel">
-
-        <div className="panel-head">
-
-          <div>
-            <p className="eyebrow">
-              COLLECTIVE BUYING
-            </p>
-
-            <h2>
-              Open group orders
-            </h2>
-          </div>
-
-          <button
-            className="text-button"
-            onClick={() => setPage('groups')}
-          >
-            View groups →
-          </button>
-
-        </div>
-
-        {loading ? (
-          <div className="empty">
-            <span>◌</span>
-            <b>Loading group orders...</b>
-          </div>
-        ) : groups.length === 0 ? (
-          <div className="empty">
-            <span>👥</span>
-
-            <b>
-              No open group orders
-            </b>
-
-            <p>
-              When a farmer starts a group order, it will show up here so you can join.
-            </p>
-
-            <button
-              className="secondary"
-              onClick={() => setPage('groups')}
-            >
-              Explore Group Orders
-            </button>
-          </div>
-        ) : (
-          <div className="table-wrap">
-
-            <table>
-
-              <thead>
-                <tr>
-                  <th>Product</th>
-                  <th>Target quantity</th>
-                  <th>Current quantity</th>
-                  <th>Discount</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-
-              <tbody>
-
-                {groups.slice(0, 5).map((group, index) => (
-
-                  <tr key={group.id || index}>
-
-                    <td>
-                      <b>
-                        {group.productName ||
-                          recommendations.find(r => r.suggestedGroupOrderId === group.id)?.productName ||
-                          group.product ||
-                          'Group order'}
-                      </b>
-                    </td>
-
-                    <td>
-                      {group.targetQuantity ??
-                        group.targetQty ??
-                        '-'}
-                    </td>
-
-                    <td>
-                      {group.currentQuantity ??
-                        group.currentQty ??
-                        '-'}
-                    </td>
-
-                    <td>
-                      {group.discountRate != null
-                        ? `${group.discountRate}%`
-                        : '-'}
-                    </td>
-
-                    <td>
-                      <span className="status success">
-                        OPEN
-                      </span>
-                    </td>
-
-                  </tr>
-
+          <PriceBoard setPage={setPage} />
+          {seg?.recommendedModules?.length > 0 && (
+            <section className="panel">
+              <div className="panel-head"><div><p className="eyebrow">{t('RECOMMENDED FOR YOUR FARM')}</p><h2>{t('Services for "{name}"', { name: t(seg.name) })}</h2></div></div>
+              <div className="quick-grid">
+                {seg.recommendedModules.map((m) => (
+                  <button key={m} onClick={() => setPage(m)}><b>{t(m === 'farmmarket' ? 'farmmarket' : m)}</b><span>{t('Open →')}</span></button>
                 ))}
-
-              </tbody>
-
-            </table>
-
-          </div>
-        )}
-
-      </section>
+              </div>
+              <p className="source-note">{t('Segments are rule-based until enough marketplace data exists to train the ML model (see Market Insights).')}</p>
+            </section>
+          )}
+        </div>
+        <div className="stack">
+          <NextSteps steps={overview?.nextSteps} setPage={setPage} loading={loading} />
+          <Weather place={farmer.location} />
+          {(role === 'FARMER' || role === 'SUPPLIER' || role === 'ADMIN') && (
+            <section className="panel">
+              <div className="panel-head"><div><p className="eyebrow">{t('BUY TOGETHER')}</p><h2>{t('Open group orders')}</h2></div>
+                <button className="text-button" onClick={() => setPage('groups')}>{t('View →')}</button></div>
+              {loading ? <SkeletonLines lines={3} /> : !groups.length
+                ? <EmptyState icon="♧" title="No open group orders" text="Start one to unlock a bulk discount with other farmers." action="Start a group order" onAction={() => setPage('groups')} />
+                : groups.slice(0, 4).map((g) => (
+                  <div className="list-row" key={g.id}>
+                    <span className="round-icon">♧</span>
+                    <div style={{ flex: 1 }}>
+                      <b>{t('{pct}% off · {have} of {need} units', { pct: g.discountRate, have: g.currentQuantity, need: g.targetQuantity })}</b>
+                      <Progress value={Math.round((g.currentQuantity / g.targetQuantity) * 100)} />
+                      {g.deadline && <p>{t('Closes {date}', { date: date(g.deadline) })}</p>}
+                    </div>
+                  </div>
+                ))}
+            </section>
+          )}
+        </div>
+      </div>
     </>
   );
 }

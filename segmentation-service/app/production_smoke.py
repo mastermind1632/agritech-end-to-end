@@ -33,7 +33,8 @@ def main():
         for role in ('farmer', 'buyer'):
             contact = 'release-check-' + str(uuid4()) + '@example.invalid'
             account = call('/farmers/register', 'POST', {'name': 'Release test ' + role, 'location': 'Polokwane',
-                           'contact': contact, 'password': secrets.token_urlsafe(24)}, expected=201)
+                           'contact': contact, 'password': secrets.token_urlsafe(24) + 'a1',
+                           'role': 'FARMER' if role == 'farmer' else 'BUYER', 'acceptTerms': True}, expected=201)
             accounts.append((account, contact))
         farmer, buyer = [row[0] for row in accounts]
         profile = {'crop': 'tomato', 'province': 'Limpopo', 'district': 'Capricorn', 'latitude': -23.9,

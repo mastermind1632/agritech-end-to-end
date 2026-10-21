@@ -71,6 +71,19 @@ public class FinanceController {
         financeService.deleteIncome(id, farmerId);
     }
 
+    @GetMapping("/monthly")
+    public List<FinanceService.MonthTotals> monthly(@RequestParam(defaultValue = "12") int months, Authentication auth) {
+        return financeService.monthly(auth.getName(), months);
+    }
+
+    @GetMapping("/export.xlsx")
+    public org.springframework.http.ResponseEntity<byte[]> export(Authentication auth) {
+        return org.springframework.http.ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"farm-finances.xlsx\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(financeService.exportWorkbook(auth.getName()));
+    }
+
     @GetMapping("/{farmerId}/summary")
     public FinanceSummary getSummary(@PathVariable String farmerId, Authentication auth) {
         if (!farmerId.equals(auth.getName())) throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN,"You can only access your own finance records");

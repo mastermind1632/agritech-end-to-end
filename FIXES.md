@@ -30,3 +30,12 @@
 - Any logged-in farmer can create/edit/delete suppliers, products and close group orders, and read any supplier's notifications (no supplier/admin role exists yet).
 - Joining a group order is not protected against two simultaneous joins overshooting the target.
 - Deleting a supplier does not remove its products/group orders (no DB foreign keys are created by `ddl-auto=update`; `database_schema.sql` has them).
+
+## Platform build (October 2026)
+- Schema is now managed by **Flyway** (`db/migration/V1..V6`); Hibernate only validates. Existing databases are adopted via a baseline.
+- Group-order joins lock the row, so two farmers joining at the same moment can no longer push an order past its target.
+- Ownership checks on suppliers, products, listings and supplier notifications (previously any signed-in user could edit them).
+- Login is rate-limited (5 tries per 15 minutes per account and address); access tokens are short-lived with rotating refresh tokens.
+- `/actuator/**` (except health) and `/api/admin/**` require the ADMIN role; security headers added.
+- Farm Market order income is tagged with its source so it is not counted twice when a bank statement is imported.
+- See docs/PLATFORM_GUIDE.md for everything that was added.

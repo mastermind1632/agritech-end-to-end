@@ -1,3 +1,5 @@
+import { tr } from './i18n.js';
+
 export function ownBuyingGroup(data, farmerId) {
   if (farmerId == null) return null;
   const group = data?.clusters?.find((group) => group.farmers?.some(
@@ -12,14 +14,14 @@ export function hasRecordedActivity(farmer) {
 }
 
 export function matchReason(reason) {
-  if (reason === 'same location') return 'Same recorded area';
-  if (reason === 'similar group-order activity') return 'Similar group-buying activity';
-  if (reason === 'similar recorded expense totals') return 'Similar recorded expense totals';
-  if (reason === 'similar spending and activity pattern') return 'Similar recorded spending and buying activity';
+  if (reason === 'same location') return tr('Same recorded area');
+  if (reason === 'similar group-order activity') return tr('Similar group-buying activity');
+  if (reason === 'similar recorded expense totals') return tr('Similar recorded expense totals');
+  if (reason === 'similar spending and activity pattern') return tr('Similar recorded spending and buying activity');
   if (reason.startsWith('shared products or expense terms: ')) {
-    return reason.replace('shared products or expense terms: ', 'Recorded items in common: ');
+    return tr('Recorded items in common: {items}', { items: reason.replace('shared products or expense terms: ', '') });
   }
-  return 'Similar recorded activity';
+  return tr('Similar recorded activity');
 }
 
 export function summarizeMatches(matches = []) {
@@ -46,10 +48,11 @@ export function spendingAlert(alert) {
   const isMoney = ['totalExpense', 'orderSpend'].includes(alert.metric);
   const format = isMoney ? money : (value) => new Intl.NumberFormat('en-ZA', { maximumFractionDigits: 1 }).format(Number(value));
   return {
-    title: titles[alert.type] || 'Recorded activity to review',
-    comparison: `Your recorded ${isMoney ? 'total' : 'count'}: ${format(alert.value)}. Average across farmers: ${format(alert.baseline)}.`,
+    title: tr(titles[alert.type] || 'Recorded activity to review'),
+    comparison: tr(isMoney ? 'Your recorded total: {value}. Average across farmers: {baseline}.' : 'Your recorded count: {value}. Average across farmers: {baseline}.',
+      { value: format(alert.value), baseline: format(alert.baseline) }),
     action: alert.type === 'low_data_signal'
-      ? 'Your comparison may be less reliable with so few expense records.'
-      : 'Check your entries and orders. A higher total does not necessarily mean a mistake.',
+      ? tr('Your comparison may be less reliable with so few expense records.')
+      : tr('Check your entries and orders. A higher total does not necessarily mean a mistake.'),
   };
 }

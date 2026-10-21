@@ -5,6 +5,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletResponse;
+import tut.ac.za.AgriFinanceAPIs.common.PageResult;
+import tut.ac.za.AgriFinanceAPIs.common.Roles;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -29,8 +33,19 @@ public class ListingController {
             @RequestParam(name = "lat", required = false) Double lat,
             @RequestParam(name = "lng", required = false) Double lng,
             @RequestParam(name = "radiusKm", required = false) Double radiusKm,
-            Authentication auth) {
-        return service.search(new ListingService.Filters(q, category, minPrice, maxPrice, availableOn, lat, lng, radiusKm), auth.getName());
+            @RequestParam(name = "sort", required = false) String sort,
+            @RequestParam(name = "minRating", required = false) Double minRating,
+            @RequestParam(name = "verifiedOnly", defaultValue = "false") boolean verifiedOnly,
+            @RequestParam(name = "page", required = false) Integer page,
+            @RequestParam(name = "size", required = false) Integer size,
+            Authentication auth, HttpServletResponse response) {
+        List<ListingResponse> all = service.search(new ListingService.Filters(q, category, minPrice, maxPrice, availableOn, lat, lng, radiusKm),
+                new ListingService.Sorting(sort, minRating, verifiedOnly), auth.getName());
+        // Total for "showing 24 of 130"; without page/size the full list is returned (backwards compatible).
+        response.setHeader("X-Total-Count", String.valueOf(all.size()));
+        response.setHeader("Access-Control-Expose-Headers", "X-Total-Count");
+        if (page == null && size == null) return all;
+        return PageResult.slice(all, page == null ? 0 : page, size == null ? 24 : size).items();
     }
 
     @GetMapping("/mine")
@@ -46,6 +61,7 @@ public class ListingController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ListingResponse create(@RequestBody ListingRequest request, Authentication auth) {
+        Roles.require(auth, Roles.FARMER);
         return service.create(auth.getName(), request);
     }
 

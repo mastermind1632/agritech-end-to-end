@@ -11,6 +11,7 @@ import tut.ac.za.AgriFinanceAPIs.chat.ChatDtos.MessageOut;
 import tut.ac.za.AgriFinanceAPIs.farmer.Farmer;
 import tut.ac.za.AgriFinanceAPIs.farmer.FarmerRepository;
 import tut.ac.za.AgriFinanceAPIs.grouporder.GroupOrderRepository;
+import tut.ac.za.AgriFinanceAPIs.notification.LiveEvents;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -28,11 +29,13 @@ public class ChatService {
     private final ChatMessageRepository messages;
     private final FarmerRepository farmers;
     private final GroupOrderRepository orders;
+    private final LiveEvents live;
 
-    public ChatService(ChatMessageRepository messages, FarmerRepository farmers, GroupOrderRepository orders) {
+    public ChatService(ChatMessageRepository messages, FarmerRepository farmers, GroupOrderRepository orders, LiveEvents live) {
         this.messages = messages;
         this.farmers = farmers;
         this.orders = orders;
+        this.live = live;
     }
 
     /** Other farmers you can message. Only id, name and location are exposed (never contact or password). */
@@ -61,7 +64,16 @@ public class ChatService {
         m.setRoom(room);
         m.setSenderId(me);
         m.setBody(text);
-        return toOut(List.of(messages.save(m))).get(0);
+        MessageOut out = toOut(List.of(messages.save(m))).get(0);
+        // Real-time: tell open browsers a message arrived, so chat updates without waiting for the next poll.
+        Map<String, Object> event = Map.of("room", room, "senderId", me);
+        if (room.startsWith("dm:")) {
+            String[] p = room.split(":");
+            live.send(p[1].equals(me) ? p[2] : p[1], "chat", event);
+        } else {
+            live.broadcast("chat", event);
+        }
+        return out;
     }
 
     /** One entry per direct-message conversation you are part of, newest first. */

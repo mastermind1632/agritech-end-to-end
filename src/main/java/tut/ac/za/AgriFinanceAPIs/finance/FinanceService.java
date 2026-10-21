@@ -37,6 +37,7 @@ public class FinanceService {
         expense.setCategory(request.getCategory());
         expense.setAmount(request.getAmount());
         expense.setDate(request.getDate() != null ? request.getDate() : java.time.LocalDate.now());
+        expense.setCrop(cropOf(request.getCrop()));
         return expenseRepository.save(expense);
     }
 
@@ -61,6 +62,7 @@ public class FinanceService {
         expense.setCategory(request.getCategory());
         expense.setAmount(request.getAmount());
         expense.setDate(request.getDate() != null ? request.getDate() : java.time.LocalDate.now());
+        expense.setCrop(cropOf(request.getCrop()));
         return expenseRepository.save(expense);
     }
 
@@ -127,6 +129,64 @@ public class FinanceService {
         if (totalIncome == null) totalIncome = BigDecimal.ZERO;
         if (totalExpenses == null) totalExpenses = BigDecimal.ZERO;
         return new FinanceSummary(farmerId, totalIncome, totalExpenses);
+    }
+
+    public record MonthTotals(String month, BigDecimal income, BigDecimal expenses, BigDecimal net,
+                              java.util.Map<String, BigDecimal> expensesByCategory) { }
+
+    /** Income and expenses per month for the last N months (oldest first), for charts and lender reports. */
+    public List<MonthTotals> monthly(String farmerId, int months) {
+        validateFarmer(farmerId);
+        int n = Math.max(1, Math.min(months, 36));
+        java.time.YearMonth end = java.time.YearMonth.now();
+        java.time.YearMonth start = end.minusMonths(n - 1L);
+        java.time.LocalDate from = start.atDay(1);
+        java.util.Map<java.time.YearMonth, BigDecimal[]> totals = new java.util.TreeMap<>();
+        java.util.Map<java.time.YearMonth, java.util.Map<String, BigDecimal>> cats = new java.util.TreeMap<>();
+        for (java.time.YearMonth m = start; !m.isAfter(end); m = m.plusMonths(1)) {
+            totals.put(m, new BigDecimal[] { BigDecimal.ZERO, BigDecimal.ZERO });
+            cats.put(m, new java.util.TreeMap<>());
+        }
+        for (Income i : incomeRepository.findAllByFarmerIdOrderByDateDesc(farmerId)) {
+            if (i.getDate() == null || i.getDate().isBefore(from)) continue;
+            BigDecimal[] t = totals.get(java.time.YearMonth.from(i.getDate()));
+            if (t != null) t[0] = t[0].add(i.getAmount());
+        }
+        for (Expense e : expenseRepository.findAllByFarmerIdOrderByDateDesc(farmerId)) {
+            if (e.getDate() == null || e.getDate().isBefore(from)) continue;
+            java.time.YearMonth ym = java.time.YearMonth.from(e.getDate());
+            BigDecimal[] t = totals.get(ym);
+            if (t == null) continue;
+            t[1] = t[1].add(e.getAmount());
+            String c = e.getCategory() == null || e.getCategory().isBlank() ? "Other" : e.getCategory();
+            cats.get(ym).merge(c, e.getAmount(), BigDecimal::add);
+        }
+        List<MonthTotals> out = new java.util.ArrayList<>();
+        totals.forEach((m, t) -> out.add(new MonthTotals(m.toString(), t[0], t[1], t[0].subtract(t[1]), cats.get(m))));
+        return out;
+    }
+
+    /** Excel workbook with a monthly summary and every income and expense line (for tax time or a loan application). */
+    public byte[] exportWorkbook(String farmerId) {
+        validateFarmer(farmerId);
+        List<List<Object>> summary = new java.util.ArrayList<>();
+        summary.add(List.of("Month", "Income (R)", "Expenses (R)", "Net (R)"));
+        for (MonthTotals m : monthly(farmerId, 24)) summary.add(List.of(m.month(), m.income(), m.expenses(), m.net()));
+        List<List<Object>> lines = new java.util.ArrayList<>();
+        lines.add(List.of("Date", "Type", "Item", "Category", "Crop", "Amount (R)", "Source"));
+        for (Income i : incomeRepository.findAllByFarmerIdOrderByDateDesc(farmerId)) {
+            lines.add(java.util.Arrays.asList(i.getDate(), "Income", i.getItem(), "", "", i.getAmount(), i.getSource() == null ? "Manual" : i.getSource()));
+        }
+        for (Expense e : expenseRepository.findAllByFarmerIdOrderByDateDesc(farmerId)) {
+            lines.add(java.util.Arrays.asList(e.getDate(), "Expense", e.getItem(), e.getCategory(), e.getCrop(), e.getAmount(), e.getSource() == null ? "Manual" : e.getSource()));
+        }
+        return new tut.ac.za.AgriFinanceAPIs.reports.SimpleXlsxWriter().sheet("Monthly summary", summary).sheet("All records", lines).toBytes();
+    }
+
+    private static String cropOf(String crop) {
+        if (crop == null || crop.isBlank()) return null;
+        String c = crop.trim();
+        return c.length() > 60 ? c.substring(0, 60) : c;
     }
 
     private void validateFarmer(String farmerId) {

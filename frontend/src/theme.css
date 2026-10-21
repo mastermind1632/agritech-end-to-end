@@ -1,0 +1,132 @@
+/* Colour themes and text size.
+   Light is the original look. Dark keeps the same greens but on a deep, low-glare background that is easier
+   on the eyes (especially at night and for people with light sensitivity). Most component colours come from
+   theme-dark.generated.css (built from the light stylesheets by tools/darkgen.py); this file holds the shared
+   palette and the hand-tuned details. lib/theme.js sets data-theme and data-text on <html>. */
+
+:root {
+  --surface: #fff;
+  --surface-2: #f2f6f4;
+  --green-strong: #0d5c45;
+  --accent-soft-ink: #58866f;
+  --ring-track: #e6eee9;
+  --focus: #2f8f68;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --green: #5cc394;
+  --green2: #49a47c;
+  --green-strong: #1c7d59;
+  --mint: #173a2d;
+  --ink: #e3ece7;
+  --muted: #9aaba3;
+  --line: #26362f;
+  --paper: #0b1511;
+  --white: #14201b;
+  --surface: #13201a;
+  --surface-2: #182821;
+  --red: #f08b84;
+  --gold: #e3b65a;
+  --shadow: 0 18px 50px rgba(0, 0, 0, .38);
+  --amber: #e7ae52;
+  --amber-bg: #33280f;
+  --bad: #f08b84;
+  --bad-bg: #371b1b;
+  --info: #82b6e4;
+  --info-bg: #14273a;
+  --good-bg: #14342a;
+  --good: #74d3a3;
+  --accent-soft-ink: #8fc7ab;
+  --ring-track: #25352d;
+  --focus: #6fd3a5;
+  color-scheme: dark;
+}
+
+body { background: var(--paper); color: var(--ink); }
+.ring-track { stroke: var(--ring-track); }
+
+/* ---------- dark theme: hand-tuned details ---------- */
+:root[data-theme="dark"] .sidebar { background: #08201a; box-shadow: 1px 0 0 #1a2f27; }
+:root[data-theme="dark"] .topbar { background: rgba(11, 21, 17, .86); backdrop-filter: blur(10px); }
+:root[data-theme="dark"] .page-head h1,
+:root[data-theme="dark"] .panel h2,
+:root[data-theme="dark"] .panel h3,
+:root[data-theme="dark"] h1, :root[data-theme="dark"] h2, :root[data-theme="dark"] h3 { color: #eef5f1; }
+:root[data-theme="dark"] .muted, :root[data-theme="dark"] .source-note { color: var(--muted); }
+:root[data-theme="dark"] input, :root[data-theme="dark"] select, :root[data-theme="dark"] textarea {
+  background-color: #0f1b16; color: var(--ink); border-color: #2c3d35;
+}
+:root[data-theme="dark"] input::placeholder, :root[data-theme="dark"] textarea::placeholder { color: #6f8279; }
+:root[data-theme="dark"] input:focus, :root[data-theme="dark"] select:focus, :root[data-theme="dark"] textarea:focus { border-color: var(--focus); }
+:root[data-theme="dark"] .secondary { color: var(--green); }
+:root[data-theme="dark"] .secondary:hover { background: #1a2b24; }
+:root[data-theme="dark"] .primary:hover { background: #22926a; }
+:root[data-theme="dark"] .auth-panel { background: radial-gradient(120% 90% at 50% 0%, #11201a 0%, #0b1511 70%); }
+:root[data-theme="dark"] .auth-card { background: var(--surface); border-color: #22332b; box-shadow: 0 24px 60px rgba(0, 0, 0, .45); }
+:root[data-theme="dark"] .auth-art { background: radial-gradient(120% 80% at 80% 0%, #164537 0%, #0b2a21 48%, #071a15 100%); }
+:root[data-theme="dark"] .skeleton { background: linear-gradient(90deg, #1a2a23 0%, #23362d 50%, #1a2a23 100%); background-size: 200% 100%; }
+:root[data-theme="dark"] .chart-axis { fill: #8fa199; }
+:root[data-theme="dark"] .chart-grid { stroke: #22322b; }
+:root[data-theme="dark"] .leaflet-layer,
+:root[data-theme="dark"] .leaflet-control-zoom-in,
+:root[data-theme="dark"] .leaflet-control-zoom-out { filter: invert(1) hue-rotate(180deg) brightness(.92) contrast(.9); }
+:root[data-theme="dark"] .leaflet-container { background: #0f1b16; }
+:root[data-theme="dark"] .leaflet-control-attribution { background: rgba(19, 32, 26, .85) !important; color: #9aaba3; }
+:root[data-theme="dark"] .leaflet-control-attribution a { color: var(--green); }
+:root[data-theme="dark"] a { color: var(--green); }
+:root[data-theme="dark"] .notice { background: #14302a; color: #bfe7d3; border-color: #24493c; }
+:root[data-theme="dark"] .error { background: #361b1b; color: #f6b5b0; border-color: #5b2b2b; }
+:root[data-theme="dark"] ::-webkit-scrollbar { width: 11px; height: 11px; }
+:root[data-theme="dark"] ::-webkit-scrollbar-thumb { background: #26382f; border-radius: 99px; border: 3px solid var(--paper); }
+:root[data-theme="dark"] ::-webkit-scrollbar-track { background: var(--paper); }
+:root[data-theme="dark"] img.avatar-img { box-shadow: 0 0 0 2px #1f3129; }
+
+/* Smooth colour change while switching theme (added for a moment by lib/theme.js). */
+:root.theme-switching, :root.theme-switching *, :root.theme-switching *::before, :root.theme-switching *::after {
+  transition: background-color .35s ease, color .35s ease, border-color .35s ease, fill .35s ease, stroke .35s ease !important;
+}
+
+/* ---------- larger text ---------- */
+:root[data-text="large"] body { zoom: 1.15; }
+@supports not (zoom: 1) { :root[data-text="large"] { font-size: 115%; } }
+
+/* ---------- theme toggle ---------- */
+.theme-toggle { border: 0; background: none; padding: 0; display: inline-grid; place-items: center; cursor: pointer; }
+.theme-toggle-track {
+  width: 52px; height: 28px; border-radius: 99px; background: #e2ece6; border: 1px solid var(--line);
+  position: relative; display: block; transition: background .35s ease, border-color .35s ease;
+}
+.theme-toggle-thumb {
+  position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; color: #c98a1c; display: grid; place-items: center; box-shadow: 0 2px 6px rgba(13, 50, 38, .2);
+  transition: transform .45s cubic-bezier(.34, 1.56, .64, 1), background .35s ease, color .35s ease;
+}
+.theme-toggle-thumb svg { width: 14px; height: 14px; transition: transform .6s ease; }
+.theme-toggle.is-dark .theme-toggle-track { background: #1c3a2f; border-color: #2c4a3e; }
+.theme-toggle.is-dark .theme-toggle-thumb { transform: translateX(24px); background: #0e1c17; color: #a8e0c4; }
+.theme-toggle.is-dark .theme-toggle-thumb svg { transform: rotate(-30deg); }
+.theme-toggle:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; border-radius: 99px; }
+.auth-lang { align-items: center; gap: 10px; }
+
+/* ---------- display picker in Settings ---------- */
+.theme-picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 14px 0 6px; }
+.theme-option {
+  text-align: left; border: 2px solid var(--line); background: var(--surface); color: var(--ink);
+  border-radius: 14px; padding: 12px; display: grid; gap: 6px; transition: border-color .2s, transform .2s, box-shadow .2s;
+}
+.theme-option:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.theme-option.on { border-color: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent); }
+.theme-option small { color: var(--muted); line-height: 1.45; }
+.theme-preview { height: 54px; border-radius: 9px; display: grid; grid-template-columns: 26% 1fr; grid-template-rows: 1fr 1fr; gap: 5px; padding: 6px; overflow: hidden; }
+.theme-preview i { border-radius: 5px; display: block; }
+.theme-preview i:first-child { grid-row: 1 / span 2; }
+.theme-light .theme-preview { background: #f7f9f7; border: 1px solid #e4e9e6; }
+.theme-light .theme-preview i:first-child { background: #102f27; }
+.theme-light .theme-preview i { background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.theme-dark .theme-preview { background: #0b1511; border: 1px solid #26362f; }
+.theme-dark .theme-preview i:first-child { background: #08201a; }
+.theme-dark .theme-preview i { background: #13201a; }
+.theme-system .theme-preview { background: linear-gradient(115deg, #f7f9f7 0 50%, #0b1511 50% 100%); border: 1px solid var(--line); }
+.theme-system .theme-preview i:first-child { background: #102f27; }
+.theme-system .theme-preview i { background: linear-gradient(115deg, #fff 0 50%, #13201a 50% 100%); }

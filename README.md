@@ -1,39 +1,39 @@
-# AgriTech Command Center
+# AgriTech
 
-A portfolio-grade full-stack agricultural finance and group-buying platform built around **Spring Boot 4.1.1, Java 21, PostgreSQL, JWT authentication, React/Vite, Docker and GitHub Actions**.
+A farm business platform for South African farmers, built with **Spring Boot 4.1.1 (Java 21), PostgreSQL + Flyway,
+React/Vite (installable PWA), Python document/OCR and ML services, Docker and GitHub Actions**.
 
-## What this project demonstrates
+> **Start here:** [docs/PLATFORM_GUIDE.md](docs/PLATFORM_GUIDE.md) explains every module, the architecture, the demo
+> accounts and a 10-minute demo script, what was verified, and the known risks.
 
-- Secure farmer registration/login with BCrypt password hashing and stateless JWT authentication.
-- Farmer finance ledger: income, expenses, totals and net position.
-- Supplier marketplace with product catalogue and local supplier information.
-- Group purchasing: create a bulk order, join it, track progress and trigger supplier notifications.
-- Decision intelligence: rule-based recommendations derived from farmer activity and open group orders.
-- Grounded Qwen farming advice through Python LangChain, plus farmer buying comparisons and spending alerts.
-- Supplier workspace for catalogue visibility and group-order notifications.
-- Responsive command-center UI suitable for a portfolio demonstration.
-- PostgreSQL persistence with Docker Compose.
-- Spring Boot Actuator health/metrics endpoints.
-- Environment-based secrets/configuration.
-- GitHub Actions CI/CD and container image support.
+## Five services in one platform
+
+1. **Farm Market**: buy and sell produce directly; roles, cash-on-delivery orders with delivery codes, ratings,
+   disputes with evidence and admin decisions, verified-business and export-ready badges, group buying with deadlines.
+2. **Business Builder**: a personalised path from informal farm to formal business (CIPC, SARS, VAT, banking,
+   UIF/COIDA, permits), a compliance calendar with reminders, and a crop plan with a 12-month cash-flow projection.
+3. **Expense Analysis (OCR + AI)**: upload a bank statement (CSV, PDF, scan or photo); it is read, balance-checked,
+   categorised and turned into cost per crop and per hectare, unusual-expense alerts and a lender-ready report.
+4. **Export Readiness (PPECB)**: an 8-stage workflow with every requirement tagged by the authority it comes from,
+   a readiness score, stage gates and change alerts that are reviewed by a person first.
+5. **Market Insights**: farmer segments (rules now, Floyd ML when there is enough data), market prices and next steps.
+
+Shared foundations: roles and permissions, an encrypted document vault, an audit log, live notifications
+(plus email, SMS and WhatsApp), five languages, offline support, two-step sign-in, and POPIA consent, data
+export and deletion.
 
 ## Architecture
 
 ```text
-React + Vite frontend
-        |
-        | JSON / REST + Bearer JWT
-        v
-Spring Boot REST API
-  |     |       |       |
-  |     |       |       +-- Decision Intelligence
-  |     |       +---------- Group Orders / Notifications
-  |     +------------------ Finance
-  +------------------------ Farmers / Suppliers
-        |
-        v
-    PostgreSQL
+React + Vite PWA  --REST + JWT / refresh tokens, Server-Sent Events-->  Spring Boot API
+                                                                          |-- PostgreSQL (Flyway V1..V6)
+                                                                          |-- document-service (PDF text + Tesseract OCR)
+                                                                          |-- segmentation-service (Floyd ML)
+                                                                          '-- langchain-service + Ollama (optional AI)
 ```
+
+Demo: set `APP_DEMO_SEED=true` in `.env`, start with Docker, and sign in as `0710000001` / `Demo@2026`
+(see the guide for all demo accounts). API documentation: `http://localhost:8080/swagger-ui.html`.
 
 ## Run with Docker
 

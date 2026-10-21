@@ -10,6 +10,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import tut.ac.za.AgriFinanceAPIs.farmer.Farmer;
 import tut.ac.za.AgriFinanceAPIs.farmer.FarmerRepository;
+import tut.ac.za.AgriFinanceAPIs.companion.BusinessProfileRepository;
+import tut.ac.za.AgriFinanceAPIs.exportready.ExportService;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -26,21 +28,50 @@ public class ListingService {
     private final FarmerRepository farmers;
     private final ListingImageRepository images;
     private final ReviewService reviewService;
+    private final BusinessProfileRepository profiles;
+    private final ExportService exports;
 
     public ListingService(ListingRepository listings, FarmerRepository farmers,
-                          ListingImageRepository images, ReviewService reviewService) {
+                          ListingImageRepository images, ReviewService reviewService,
+                          BusinessProfileRepository profiles, ExportService exports) {
         this.listings = listings;
         this.farmers = farmers;
         this.images = images;
         this.reviewService = reviewService;
+        this.profiles = profiles;
+        this.exports = exports;
     }
 
     /** Search filters. Price filters use the price a buyer would actually pay today (sale price included). */
     public record Filters(String q, String category, BigDecimal minPrice, BigDecimal maxPrice,
                           LocalDate availableOn, Double lat, Double lng, Double radiusKm) { }
 
+    /** Sort: newest (default), price_asc, price_desc, rating, distance. minRating filters on the seller's rating. */
+    public record Sorting(String sort, Double minRating, boolean verifiedOnly) { }
+
     private record Ctx(Map<String, Farmer> sellers, Map<Long, List<Long>> images,
-                       Map<String, ReviewService.Agg> farmerRatings, Map<String, ReviewService.Agg> productRatings) { }
+                       Map<String, ReviewService.Agg> farmerRatings, Map<String, ReviewService.Agg> productRatings,
+                       Set<String> verified, Set<String> exportReady) { }
+
+    /** Search, then filter on rating / verification and sort. Paging is applied by the caller. */
+    @Transactional(readOnly = true)
+    public List<ListingResponse> search(Filters f, Sorting s, String viewerId) {
+        List<ListingResponse> all = new ArrayList<>(search(f, viewerId));
+        if (s == null) return all;
+        if (s.minRating() != null) all.removeIf(l -> l.sellerRating() == null || l.sellerRating() < s.minRating());
+        if (s.verifiedOnly()) all.removeIf(l -> !l.sellerVerified());
+        String sort = s.sort() == null ? "newest" : s.sort().trim().toLowerCase();
+        Comparator<ListingResponse> cmp = switch (sort) {
+            case "price_asc" -> Comparator.comparing(ListingResponse::effectivePrice);
+            case "price_desc" -> Comparator.comparing(ListingResponse::effectivePrice).reversed();
+            case "rating" -> Comparator.comparing((ListingResponse l) -> l.sellerRating() == null ? 0.0 : l.sellerRating()).reversed()
+                    .thenComparing(ListingResponse::sellerRatingCount, Comparator.reverseOrder());
+            case "distance" -> Comparator.comparing(ListingResponse::distanceKm, Comparator.nullsLast(Comparator.naturalOrder()));
+            default -> null;
+        };
+        if (cmp != null) all.sort(cmp);
+        return all;
+    }
 
     @Transactional(readOnly = true)
     public List<ListingResponse> search(Filters f, String viewerId) {
@@ -219,7 +250,9 @@ public class ListingService {
         Map<String, ReviewService.Agg> fr = reviewService.aggregates("FARMER", sellerIds);
         Map<String, ReviewService.Agg> pr = reviewService.aggregates("PRODUCT",
                 listingIds.stream().map(String::valueOf).collect(Collectors.toSet()));
-        return new Ctx(sellers, imgs, fr, pr);
+        Set<String> verified = sellerIds.isEmpty() ? Set.of() : new HashSet<>(profiles.verifiedAmong(sellerIds));
+        Set<String> exportReady = exports.exportReady(sellerIds);
+        return new Ctx(sellers, imgs, fr, pr, verified, exportReady);
     }
 
     private ListingResponse toResponse(Listing l, Ctx ctx, String viewerId, Double distanceKm) {
@@ -240,7 +273,8 @@ public class ListingService {
                 distanceKm == null ? null : Math.round(distanceKm * 10.0) / 10.0, l.getCreatedAt(),
                 ctx.images().getOrDefault(l.getId(), List.of()),
                 fr == null ? null : fr.average(), fr == null ? 0 : fr.count(),
-                pr == null ? null : pr.average(), pr == null ? 0 : pr.count());
+                pr == null ? null : pr.average(), pr == null ? 0 : pr.count(),
+                ctx.verified().contains(l.getSellerId()), ctx.exportReady().contains(l.getSellerId()));
     }
 
     private static String blankToNull(String s) { return (s == null || s.isBlank()) ? null : s.trim(); }

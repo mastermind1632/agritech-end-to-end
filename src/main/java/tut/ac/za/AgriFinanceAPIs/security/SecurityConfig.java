@@ -12,6 +12,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -45,7 +46,16 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/api/farmers/register", "/api/farmers/login", "/error").permitAll()
+                .requestMatchers("/api/auth/refresh", "/api/auth/logout", "/api/auth/forgot-password", "/api/auth/reset-password").permitAll()
+                // Live notifications: EventSource cannot send headers, so the stream checks its own short-lived ticket.
+                .requestMatchers(HttpMethod.GET, "/api/live/stream").permitAll()
+                // Public reference data (export requirements directory, guidance content, resource links).
+                .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                // API documentation (Swagger UI). Set SPRINGDOC_ENABLED=false to switch it off in production.
+                .requestMatchers("/v3/api-docs", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/actuator/**").hasRole("ADMIN")
                 // Public browsing. "/api/group-orders/*" matches ONE path segment only, so
                 // /api/group-orders/{id}/items (which lists farmer ids) still needs a login.
                 .requestMatchers(HttpMethod.GET, "/api/suppliers", "/api/suppliers/**").permitAll()
@@ -53,6 +63,10 @@ public class SecurityConfig {
                 // Product photos are public so a plain <img> tag can load them (it cannot send a login header).
                 .requestMatchers(HttpMethod.GET, "/api/market/images/*").permitAll()
                 .anyRequest().authenticated())
+            .headers(h -> h
+                .contentTypeOptions(c -> { })
+                .frameOptions(f -> f.deny())
+                .referrerPolicy(r -> r.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)))
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
@@ -63,7 +77,7 @@ public class SecurityConfig {
         CorsConfiguration c = new CorsConfiguration();
         List<String> origins = Arrays.stream(allowedOrigins).map(String::trim).filter(s -> !s.isEmpty()).toList();
         c.setAllowedOrigins(origins);
-        c.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        c.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         c.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         c.setAllowCredentials(false);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

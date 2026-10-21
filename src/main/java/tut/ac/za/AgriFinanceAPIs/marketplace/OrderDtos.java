@@ -27,7 +27,8 @@ public final class OrderDtos {
             List<String> allowedActions,
             LocalDateTime createdAt, LocalDateTime updatedAt, LocalDateTime deliveredAt, LocalDateTime completedAt,
             Long imageId, BigDecimal costTotal, BigDecimal profit, boolean reviewed, boolean canReview,
-            List<EventView> events) { }
+            List<EventView> events,
+            Integer buyerReliability, Long openDisputeId, Long latestDisputeId) { }
 
     public record SalesSummary(long completedOrders, long pendingOrders, BigDecimal revenue,
                                BigDecimal knownCost, BigDecimal profit, long ordersMissingCost) { }

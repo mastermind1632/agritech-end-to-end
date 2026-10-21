@@ -2,13 +2,17 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import useLive from '../hooks/useLive';
 import Avatar from '../components/Avatar';
 import { chatApi, groupApi, marketApi } from '../lib/api';
+import useLang from '../hooks/useLang';
+import { intlLocale } from '../lib/i18n';
+import { date } from '../lib/format';
 
 // DM rooms must match the backend: "dm:<idA>:<idB>" with the two ids sorted.
 const dmRoom = (a, b) => (a < b ? `dm:${a}:${b}` : `dm:${b}:${a}`);
-const timeOf = (t) => (t ? new Date(t).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' }) : '');
-const dayOf = (t) => (t ? new Date(t).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }) : '');
+const timeOf = (t) => (t ? new Date(t).toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit' }) : '');
+const dayOf = (t) => (t ? date(t) : '');
 
 export default function Chat({ farmer }) {
+  const { t } = useLang();
   const [active, setActive] = useState({ room: 'community', title: 'Community', sub: 'All farmers' });
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -30,7 +34,7 @@ export default function Chat({ farmer }) {
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length, active.room]);
 
   const { convos = [], farmers = [], orders = [], products = [] } = side.data || {};
-  const productName = (id) => products.find((p) => p.id === id)?.productName || 'Group order';
+  const productName = (id) => products.find((p) => p.id === id)?.productName || t('Group order');
 
   const people = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -38,7 +42,7 @@ export default function Chat({ farmer }) {
   }, [farmers, search]);
 
   const openDm = (id, name, location) =>
-    setActive({ room: dmRoom(farmer.id, id), title: name || 'Farmer', sub: location || 'Direct message' });
+    setActive({ room: dmRoom(farmer.id, id), title: name || t('Farmer'), sub: location || 'Direct message' });
 
   const send = async (e) => {
     e.preventDefault();
@@ -60,7 +64,7 @@ export default function Chat({ farmer }) {
     <button key={room} className={`chat-item ${active.room === room ? 'active' : ''}`}
       onClick={() => setActive({ room, title, sub })}>
       <span className="round-icon">{badge}</span>
-      <span className="chat-item-text"><b>{title}</b><small>{sub}</small></span>
+      <span className="chat-item-text"><b>{t(title)}</b><small>{t(sub)}</small></span>
     </button>
   );
 
@@ -68,34 +72,34 @@ export default function Chat({ farmer }) {
     <>
       <div className="page-head">
         <div>
-          <p className="eyebrow">FARMER NETWORK</p>
-          <h1>Chat</h1>
-          <p className="muted">Talk to the community, coordinate group orders, or message a farmer directly.</p>
+          <p className="eyebrow">{t('FARMER NETWORK')}</p>
+          <h1>{t('chat')}</h1>
+          <p className="muted">{t('Talk to the community, coordinate group orders, or message a farmer directly.')}</p>
         </div>
       </div>
 
       <div className="chat-layout">
         <aside className="chat-side panel">
-          <div className="chat-section">ROOMS</div>
+          <div className="chat-section">{t('ROOMS')}</div>
           {roomButton('community', 'Community', 'All farmers', '♧')}
 
-          {orders.length > 0 && <div className="chat-section">GROUP ORDERS</div>}
-          {orders.map((o) => roomButton(`order:${o.id}`, productName(o.productId), `${o.currentQuantity}/${o.targetQuantity} units`, '▤'))}
+          {orders.length > 0 && <div className="chat-section">{t('GROUP ORDERS')}</div>}
+          {orders.map((o) => roomButton(`order:${o.id}`, productName(o.productId), t('{have}/{need} units', { have: o.currentQuantity, need: o.targetQuantity }), '▤'))}
 
-          {convos.length > 0 && <div className="chat-section">DIRECT MESSAGES</div>}
+          {convos.length > 0 && <div className="chat-section">{t('DIRECT MESSAGES')}</div>}
           {convos.map((c) => (
             <button key={c.room} className={`chat-item ${active.room === c.room ? 'active' : ''}`}
               onClick={() => setActive({ room: c.room, title: c.otherName, sub: 'Direct message' })}>
               <Avatar id={c.otherId} name={c.otherName} size={32} />
               <span className="chat-item-text">
                 <b>{c.otherName}</b>
-                <small>{c.lastSenderId === farmer.id ? 'You: ' : ''}{c.lastBody}</small>
+                <small>{c.lastSenderId === farmer.id ? `${t('You:')} ` : ''}{c.lastBody}</small>
               </span>
             </button>
           ))}
 
-          <div className="chat-section">START A CONVERSATION</div>
-          <input className="chat-search" placeholder="Search farmers…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <div className="chat-section">{t('START A CONVERSATION')}</div>
+          <input className="chat-search" placeholder={t('Search farmers…')} value={search} onChange={(e) => setSearch(e.target.value)} />
           <div className="chat-people">
             {people.map((f) => (
               <button key={f.id} className="chat-item" onClick={() => openDm(f.id, f.name, f.location)}>
@@ -104,14 +108,14 @@ export default function Chat({ farmer }) {
               </button>
             ))}
             {!people.length && !side.loading && (
-              <p className="muted" style={{ fontSize: 11, padding: '6px 10px' }}>No other farmers found.</p>
+              <p className="muted" style={{ fontSize: 11, padding: '6px 10px' }}>{t('No other farmers found.')}</p>
             )}
           </div>
           {side.error && <div className="error">{side.error}</div>}
         </aside>
 
         <section className="chat-main panel">
-          <div className="chat-head"><b>{active.title}</b><span>{active.sub}</span></div>
+          <div className="chat-head"><b>{t(active.title)}</b><span>{t(active.sub)}</span></div>
           <div className="chat-messages">
             {messages.map((m, i) => {
               const mine = m.senderId === farmer.id;
@@ -130,16 +134,16 @@ export default function Chat({ farmer }) {
               );
             })}
             {!messages.length && !msgs.loading && !msgs.error && (
-              <div className="empty"><span>✉</span><b>No messages yet</b><p>Say hello and start the conversation.</p></div>
+              <div className="empty"><span className="empty-icon">✉</span><b>{t('No messages yet')}</b><p>{t('Say hello and start the conversation.')}</p></div>
             )}
             {msgs.error && <div className="error">{msgs.error}</div>}
             <div ref={bottomRef} />
           </div>
           {sendError && <div className="error" style={{ margin: '0 16px' }}>{sendError}</div>}
           <form className="chat-compose" onSubmit={send}>
-            <textarea rows={1} maxLength={1000} placeholder="Type a message…" value={draft}
+            <textarea rows={1} maxLength={1000} placeholder={t('Type a message…')} value={draft}
               onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} />
-            <button className="primary" disabled={sending || !draft.trim()}>Send →</button>
+            <button className="primary" disabled={sending || !draft.trim()}>{t('Send →')}</button>
           </form>
         </section>
       </div>

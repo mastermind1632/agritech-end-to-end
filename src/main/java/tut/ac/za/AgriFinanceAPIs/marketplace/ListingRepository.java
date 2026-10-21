@@ -17,4 +17,17 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select l from Listing l where l.id = :id")
     Optional<Listing> findForUpdate(@Param("id") Long id);
+
+    /** Rows of [unit, average asking price, count] for active listings whose product name matches. */
+    @Query("select l.unit, avg(l.pricePerUnit), count(l) from Listing l where l.status = 'ACTIVE' and lower(l.product) like :pattern group by l.unit")
+    List<Object[]> askingPrices(@Param("pattern") String pattern);
+
+    /** Rows of [product, unit, average asking price, min, max, count] across all active listings. */
+    @Query("select lower(l.product), l.unit, avg(l.pricePerUnit), min(l.pricePerUnit), max(l.pricePerUnit), count(l) "
+            + "from Listing l where l.status = 'ACTIVE' group by lower(l.product), l.unit order by count(l) desc")
+    List<Object[]> priceBoard();
+
+    long countByStatus(String status);
+
+    long countBySellerIdAndStatus(String sellerId, String status);
 }

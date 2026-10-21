@@ -47,7 +47,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Map<String, Object>> handleTooBig(MaxUploadSizeExceededException ex) {
-        return body(HttpStatus.valueOf(413), "Image is too large (max 2 MB)");
+        return body(HttpStatus.valueOf(413), "That file is too large. Photos can be up to 2 MB, documents up to 8 MB and statements up to 10 MB.");
     }
 
     private ResponseEntity<Map<String, Object>> body(HttpStatus status, String message) {

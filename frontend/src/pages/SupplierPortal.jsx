@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import Modal from '../components/Modal';
 import useLive from '../hooks/useLive';
 import { api, marketApi } from '../lib/api';
+import useLang from '../hooks/useLang';
 
 const emptySupplier = { name: '', location: '', contact: '' };
 const emptyProduct = { productName: '', price: '', comparisonKey: '', packSize: '', packUnit: '' };
 
-export default function SupplierPortal() {
+export default function SupplierPortal({ farmer }) {
+  const { t } = useLang();
   const [suppliers, setSuppliers] = useState([]);
   const [selected, setSelected] = useState('');
   const [loadError, setLoadError] = useState('');
@@ -20,7 +22,7 @@ export default function SupplierPortal() {
 
   const loadSuppliers = async (pick) => {
     try {
-      const list = (await marketApi.suppliers()) || [];
+      const list = (await (farmer?.role === 'ADMIN' ? marketApi.suppliers() : marketApi.mine())) || [];
       setSuppliers(list);
       setSelected((cur) => pick ?? (list.some((s) => s.id === cur) ? cur : list[0]?.id || ''));
     } catch (e) { setLoadError(e.message); }
@@ -36,7 +38,7 @@ export default function SupplierPortal() {
   const { products = [], notifications = [], count = 0 } = data || {};
   const current = suppliers.find((s) => s.id === selected);
 
-  const note = (m) => { setFlash(m); setTimeout(() => setFlash(''), 3500); };
+  const note = (m) => { setFlash(t(m)); setTimeout(() => setFlash(''), 3500); };
   const run = async (fn, done) => {
     setError(''); setBusy(true);
     try { await fn(); done(); } catch (e) { setError(e.message); } finally { setBusy(false); }
@@ -52,7 +54,7 @@ export default function SupplierPortal() {
     }, () => setSupplierModal(null));
   };
   const removeSupplier = async () => {
-    if (!window.confirm(`Delete supplier "${current.name}"? Its products will no longer be reachable.`)) return;
+    if (!window.confirm(t('Delete supplier "{name}"? Its products will no longer be reachable.', { name: current.name }))) return;
     try { await marketApi.deleteSupplier(selected); await loadSuppliers(''); note('Supplier deleted.'); } catch (e) { setLoadError(e.message); }
   };
 
@@ -70,7 +72,7 @@ export default function SupplierPortal() {
     }, () => setProductModal(null));
   };
   const removeProduct = async (p) => {
-    if (!window.confirm(`Delete "${p.productName}"?`)) return;
+    if (!window.confirm(t('Delete "{item}"?', { item: p.productName }))) return;
     try { await marketApi.deleteProduct(p.id); note('Product deleted.'); refresh(); } catch (e) { setLoadError(e.message); }
   };
   const markRead = async (id) => { try { await api(`/notifications/${id}/read`, { method: 'PUT' }); refresh(); } catch (e) { setLoadError(e.message); } };
@@ -78,47 +80,47 @@ export default function SupplierPortal() {
   return (
     <>
       <div className="page-head">
-        <div><p className="eyebrow">FOR SUPPLIERS</p><h1>Supplier portal</h1><p className="muted">List the suppliers and products you sell here. Farmers will see them in the Supplier Shop and can buy them together through Group Orders.</p></div>
+        <div><p className="eyebrow">{t('FOR SUPPLIERS')}</p><h1>{t('Supplier portal')}</h1><p className="muted">{t('List the suppliers and products you sell here. Farmers will see them in the Supplier Shop and can buy them together through Group Orders.')}</p></div>
         <div className="head-actions">
           {suppliers.length > 0 && <select className="filter" value={selected} onChange={(e) => setSelected(e.target.value)}>{suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>}
-          <button className="primary" onClick={openNewSupplier}>+ Add supplier</button>
+          <button className="primary" onClick={openNewSupplier}>{t('+ Add supplier')}</button>
         </div>
       </div>
       {flash && <div className="notice">{flash}</div>}
       {(dataError || loadError) && <div className="error">{loadError || dataError}</div>}
 
       {!suppliers.length ? (
-        <div className="empty"><span>▤</span><b>No suppliers yet</b><p>Add your first supplier, then list products for it.</p><button className="primary" onClick={openNewSupplier}>+ Add supplier</button></div>
+        <div className="empty"><span className="empty-icon">▤</span><b>{t('No suppliers yet')}</b><p>{t('Add your first supplier, then list products for it.')}</p><button className="primary" onClick={openNewSupplier}>{t('+ Add supplier')}</button></div>
       ) : (
         <>
           <section className="stats">
-            <div className="stat-card"><span>Listed products</span><strong>{products.length}</strong><small>Active catalogue</small></div>
-            <div className="stat-card"><span>Unread alerts</span><strong>{count}</strong><small className="positive">Group-order activity</small></div>
-            <div className="stat-card"><span>Location</span><strong>{current?.location || '—'}</strong><small>{current?.contact || 'No contact set'}</small></div>
+            <div className="stat-card"><span>{t('Listed products')}</span><strong>{products.length}</strong><small>{t('Active catalogue')}</small></div>
+            <div className="stat-card"><span>{t('Unread alerts')}</span><strong>{count}</strong><small className="positive">{t('Group-order activity')}</small></div>
+            <div className="stat-card"><span>{t('Location')}</span><strong>{current?.location || '—'}</strong><small>{current?.contact || t('No contact set')}</small></div>
           </section>
           <div className="head-actions" style={{ padding: '0 48px 16px' }}>
-            <button className="secondary" onClick={openEditSupplier}>Edit supplier</button>
-            <button className="secondary" onClick={removeSupplier}>Delete supplier</button>
+            <button className="secondary" onClick={openEditSupplier}>{t('Edit supplier')}</button>
+            <button className="secondary" onClick={removeSupplier}>{t('Delete supplier')}</button>
           </div>
           <div className="dashboard-grid">
             <section className="panel">
-              <div className="panel-head"><div><p className="eyebrow">CATALOGUE</p><h2>Products</h2></div><button className="primary" onClick={openNewProduct}>+ Add product</button></div>
+              <div className="panel-head"><div><p className="eyebrow">{t('CATALOGUE')}</p><h2>{t('Products')}</h2></div><button className="primary" onClick={openNewProduct}>{t('+ Add product')}</button></div>
               {products.map((p) => (
                 <div className="list-row" key={p.id}><span className="round-icon">❧</span>
-                  <div style={{ flex: 1 }}><b>{p.productName}</b><p>Listed at R {Number(p.price).toFixed(2)}</p></div>
-                  <button className="text-button" onClick={() => openEditProduct(p)}>Edit</button>
-                  <button className="text-button" onClick={() => removeProduct(p)}>Delete</button>
+                  <div style={{ flex: 1 }}><b>{p.productName}</b><p>{t('Listed at R {price}', { price: Number(p.price).toFixed(2) })}</p></div>
+                  <button className="text-button" onClick={() => openEditProduct(p)}>{t('Edit')}</button>
+                  <button className="text-button" onClick={() => removeProduct(p)}>{t('Delete')}</button>
                 </div>))}
-              {!products.length && <div className="empty"><span>▤</span><b>No products listed</b><p>Click "Add product" to list your first item.</p></div>}
+              {!products.length && <div className="empty"><span className="empty-icon">▤</span><b>{t('No products listed')}</b><p>{t('Click "Add product" to list your first item.')}</p></div>}
             </section>
             <section className="panel">
-              <div className="panel-head"><div><p className="eyebrow">INBOX</p><h2>Group-order alerts</h2></div></div>
+              <div className="panel-head"><div><p className="eyebrow">{t('INBOX')}</p><h2>{t('Group-order alerts')}</h2></div></div>
               {notifications.slice(0, 10).map((n) => (
                 <div className="list-row" key={n.id}><span className="round-icon">◔</span>
-                  <div style={{ flex: 1 }}><b>{n.read ? 'Read' : 'New alert'}</b><p>{n.message}</p></div>
-                  {!n.read && <button className="text-button" onClick={() => markRead(n.id)}>Mark read</button>}
+                  <div style={{ flex: 1 }}><b>{n.read ? t('Read') : t('New alert')}</b><p>{t(n.message)}</p></div>
+                  {!n.read && <button className="text-button" onClick={() => markRead(n.id)}>{t('Mark read')}</button>}
                 </div>))}
-              {!notifications.length && <div className="empty"><span>◔</span><b>No alerts</b><p>Alerts appear when farmers create or join group orders for this supplier's products.</p></div>}
+              {!notifications.length && <div className="empty"><span className="empty-icon">◔</span><b>{t('No alerts')}</b><p>{t("Alerts appear when farmers create or join group orders for this supplier's products.")}</p></div>}
             </section>
           </div>
         </>
@@ -126,26 +128,26 @@ export default function SupplierPortal() {
 
       <Modal open={!!supplierModal} title={supplierModal === 'edit' ? 'Edit supplier' : 'Add supplier'} onClose={() => setSupplierModal(null)}>
         <form onSubmit={saveSupplier} className="modal-form">
-          <label>Name<input value={sForm.name} onChange={(e) => setSForm({ ...sForm, name: e.target.value })} placeholder="Limpopo Agri Co-op" required /></label>
-          <label>Location<input value={sForm.location} onChange={(e) => setSForm({ ...sForm, location: e.target.value })} placeholder="Polokwane" /></label>
-          <label>Contact<input value={sForm.contact} onChange={(e) => setSForm({ ...sForm, contact: e.target.value })} placeholder="015 123 4567" /></label>
+          <label>{t('Name')}<input value={sForm.name} onChange={(e) => setSForm({ ...sForm, name: e.target.value })} placeholder="Limpopo Agri Co-op" required /></label>
+          <label>{t('Location')}<input value={sForm.location} onChange={(e) => setSForm({ ...sForm, location: e.target.value })} placeholder="Polokwane" /></label>
+          <label>{t('Contact')}<input value={sForm.contact} onChange={(e) => setSForm({ ...sForm, contact: e.target.value })} placeholder="015 123 4567" /></label>
           {error && <div className="error" style={{ margin: 0 }}>{error}</div>}
-          <button className="primary full" disabled={busy}>{busy ? 'Saving…' : 'Save supplier →'}</button>
+          <button className="primary full" disabled={busy}>{busy ? t('Saving…') : t('Save supplier →')}</button>
         </form>
       </Modal>
       <Modal open={!!productModal} title={productModal === 'new' ? 'Add product' : 'Edit product'} onClose={() => setProductModal(null)}>
         <form onSubmit={saveProduct} className="modal-form">
-          <label>Product name<input value={pForm.productName} onChange={(e) => setPForm({ ...pForm, productName: e.target.value })} placeholder="50kg NPK fertilizer" required /></label>
-          <label>Price (ZAR)<input type="number" min="0" step="0.01" inputMode="decimal" value={pForm.price} onChange={(e) => setPForm({ ...pForm, price: e.target.value })} required /></label>
-          <label>Product specification code (optional)<input maxLength={150} value={pForm.comparisonKey}
+          <label>{t('Product name')}<input value={pForm.productName} onChange={(e) => setPForm({ ...pForm, productName: e.target.value })} placeholder="50kg NPK fertilizer" required /></label>
+          <label>{t('Price (ZAR)')}<input type="number" min="0" step="0.01" inputMode="decimal" value={pForm.price} onChange={(e) => setPForm({ ...pForm, price: e.target.value })} required /></label>
+          <label>{t('Product specification code (optional)')}<input maxLength={150} value={pForm.comparisonKey}
             onChange={e => setPForm({ ...pForm, comparisonKey: e.target.value })} /></label>
-          <label>Pack size<input type="number" min="0.001" max="999999999.999" step="0.001" value={pForm.packSize}
+          <label>{t('Pack size')}<input type="number" min="0.001" max="999999999.999" step="0.001" value={pForm.packSize}
             onChange={e => setPForm({ ...pForm, packSize: e.target.value })} required={!!pForm.comparisonKey} /></label>
-          <label>Pack unit<select value={pForm.packUnit} onChange={e => setPForm({ ...pForm, packUnit: e.target.value })}
-            required={!!pForm.comparisonKey}><option value="">Not recorded</option><option value="kg">kg</option>
-            <option value="l">litres</option><option value="unit">units</option></select></label>
+          <label>{t('Pack unit')}<select value={pForm.packUnit} onChange={e => setPForm({ ...pForm, packUnit: e.target.value })}
+            required={!!pForm.comparisonKey}><option value="">{t('Not recorded')}</option><option value="kg">kg</option>
+            <option value="l">{t('litres')}</option><option value="unit">{t('units')}</option></select></label>
           {error && <div className="error" style={{ margin: 0 }}>{error}</div>}
-          <button className="primary full" disabled={busy}>{busy ? 'Saving…' : 'Save product →'}</button>
+          <button className="primary full" disabled={busy}>{busy ? t('Saving…') : t('Save product →')}</button>
         </form>
       </Modal>
     </>

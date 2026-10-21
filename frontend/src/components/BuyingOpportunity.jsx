@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { recommendationApi } from '../lib/api';
+import useLang from '../hooks/useLang';
+import { tr } from '../lib/i18n';
+import { dateTime } from '../lib/format';
 
 const rand = value => {
   const number = Number(value);
-  return value == null || !Number.isFinite(number) ? 'Unknown' :
+  return value == null || !Number.isFinite(number) ? tr('Unknown') :
     new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(number);
 };
 
 export default function BuyingOpportunity({ item, reviewOrder, requestReview, reviewDisabled }) {
+  const { t } = useLang();
   const [opportunity, setOpportunity] = useState(item);
   const [quantity, setQuantity] = useState(1);
   const [busy, setBusy] = useState(false);
@@ -28,35 +32,34 @@ export default function BuyingOpportunity({ item, reviewOrder, requestReview, re
   };
   return <article className="buying-opportunity">
     <h3>{opportunity.productName}</h3>
-    <span className="tag">{opportunity.matchedItems?.length ? 'PURCHASE MATCH' : 'OPEN ORDER'}</span>
+    <span className="tag">{opportunity.matchedItems?.length ? t('PURCHASE MATCH') : t('OPEN ORDER')}</span>
     <p>{opportunity.reason}</p>
     <form className="buying-quantity" onSubmit={check}>
-      <label>Quantity<input type="number" min="1" max={opportunity.remainingQuantity} step="1"
+      <label>{t('Quantity')}<input type="number" min="1" max={opportunity.remainingQuantity} step="1"
         value={quantity} disabled={busy} onChange={e => setQuantity(e.target.value)} required /></label>
-      <button className="secondary" disabled={busy}>{busy ? 'Checking...' : 'Check listed prices'}</button>
+      <button className="secondary" disabled={busy}>{busy ? t('Checking...') : t('Check listed prices')}</button>
     </form>
-    <p className="muted">{opportunity.remainingQuantity} units remaining</p>
-    {changed ? <p role="status">Check prices for the changed quantity.</p> : <dl className="buying-prices">
-      <div><dt>Listed total ({quote.quantity} units)</dt><dd>{rand(quote.listedTotal)}</dd></div>
-      <div><dt>With listed {quote.listedDiscountPercent}% group discount</dt><dd>{rand(quote.indicativeGroupTotal)}</dd></div>
-      <div><dt>Indicative difference</dt><dd>{rand(quote.indicativeDifference)}</dd></div>
+    <p className="muted">{t('{n} units remaining', { n: opportunity.remainingQuantity })}</p>
+    {changed ? <p role="status">{t('Check prices for the changed quantity.')}</p> : <dl className="buying-prices">
+      <div><dt>{t('Listed total ({n} units)', { n: quote.quantity })}</dt><dd>{rand(quote.listedTotal)}</dd></div>
+      <div><dt>{t('With listed {pct}% group discount', { pct: quote.listedDiscountPercent })}</dt><dd>{rand(quote.indicativeGroupTotal)}</dd></div>
+      <div><dt>{t('Indicative difference')}</dt><dd>{rand(quote.indicativeDifference)}</dd></div>
     </dl>}
-    <p className="buying-caution">Same listed product only. Discount is not supplier-confirmed.
-      Pack specifications, delivery costs, stock and final payment terms must be checked with the supplier.</p>
+    <p className="buying-caution">{t('Same listed product only. Discount is not supplier-confirmed. Pack specifications, delivery costs, stock and final payment terms must be checked with the supplier.')}</p>
     {!!opportunity.equivalentPrices?.length && <div className="buying-alternatives">
-      <h4>Matching recorded specifications</h4>
-      <p className="muted">Catalogue specification codes are user-entered, not independently verified.</p>
+      <h4>{t('Matching recorded specifications')}</h4>
+      <p className="muted">{t('Catalogue specification codes are user-entered, not independently verified.')}</p>
       <ul>{opportunity.equivalentPrices.map(price => <li key={price.productId}>
-        <span>{price.productName} ({price.packSize} {price.packUnit}){price.productId === opportunity.recommendedProductId ? ' - this listing' : ''}</span>
+        <span>{price.productName} ({price.packSize} {price.packUnit}){price.productId === opportunity.recommendedProductId ? ` - ${t('this listing')}` : ''}</span>
         <strong>{rand(price.pricePerUnit)} / {price.packUnit}</strong>
       </li>)}</ul>
     </div>}
-    {!opportunity.equivalentPrices?.length && <p className="muted">No pack specifications available for comparisons across listings.</p>}
-    <small>Prices checked: {new Date(quote.checkedAt).toLocaleString()}</small>
+    {!opportunity.equivalentPrices?.length && <p className="muted">{t('No pack specifications available for comparisons across listings.')}</p>}
+    <small>{t('Prices checked:')} {dateTime(quote.checkedAt)}</small>
     {error && <p className="farm-error" role="alert">{error}</p>}
-    <button className="text-button" disabled={busy || changed || !!error} onClick={() => reviewOrder(opportunity.suggestedGroupOrderId, quote.quantity)}>Review this order</button>
+    <button className="text-button" disabled={busy || changed || !!error} onClick={() => reviewOrder(opportunity.suggestedGroupOrderId, quote.quantity)}>{t('Review this order')}</button>
     <button className="secondary" disabled={reviewDisabled || busy || changed || !!error}
       onClick={() => requestReview({ orderId: opportunity.suggestedGroupOrderId, quantity: quote.quantity })}>
-      Request assistant review</button>
+      {t('Request assistant review')}</button>
   </article>;
 }

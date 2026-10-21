@@ -9,6 +9,7 @@ public class ExpenseRequest {
     private String category;
     private BigDecimal amount;
     private LocalDate date;
+    private String crop;
 
     public ExpenseRequest() {}
 
@@ -22,4 +23,6 @@ public class ExpenseRequest {
     public void setAmount(BigDecimal amount) { this.amount = amount; }
     public LocalDate getDate() { return date; }
     public void setDate(LocalDate date) { this.date = date; }
+    public String getCrop() { return crop; }
+    public void setCrop(String crop) { this.crop = crop; }
 }

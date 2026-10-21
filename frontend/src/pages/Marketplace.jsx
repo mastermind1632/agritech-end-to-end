@@ -3,10 +3,12 @@ import { marketApi } from '../lib/api';
 import { reviewApi } from '../lib/market';
 import { Stars, StarInput } from '../components/Stars';
 import ReviewsPanel from '../components/Reviews';
+import useLang from '../hooks/useLang';
 
 const money = (n) => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(Number(n || 0));
 
 function RateSupplier({ supplier, onDone, onCancel }) {
+  const { t } = useLang();
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [error, setError] = useState('');
@@ -14,7 +16,7 @@ function RateSupplier({ supplier, onDone, onCancel }) {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!rating) return setError('Tap the stars to choose a rating.');
+    if (!rating) return setError(t('Tap the stars to choose a rating.'));
     setBusy(true); setError('');
     try { await reviewApi.supplier(supplier.id, { rating, comment }); onDone(); }
     catch (err) { setError(err.message); setBusy(false); }
@@ -22,22 +24,23 @@ function RateSupplier({ supplier, onDone, onCancel }) {
 
   return (
     <form onSubmit={submit} className="fm-panel fm-form">
-      <h3>Rate {supplier.name}</h3>
-      <p className="muted" style={{ marginBottom: 10 }}>You can rate a supplier once you have joined one of their group orders. Rating again replaces your earlier rating.</p>
+      <h3>{t('Rate {name}', { name: supplier.name })}</h3>
+      <p className="muted" style={{ marginBottom: 10 }}>{t('You can rate a supplier once you have joined one of their group orders. Rating again replaces your earlier rating.')}</p>
       {error && <div className="error" style={{ marginBottom: 10 }}>{error}</div>}
       <StarInput value={rating} onChange={setRating} label="Supplier rating" />
-      <label style={{ marginTop: 10 }}>Comment (optional)
-        <textarea className="filter" rows={2} maxLength={500} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Delivery, quality, price" />
+      <label style={{ marginTop: 10 }}>{t('Comment (optional)')}
+        <textarea className="filter" rows={2} maxLength={500} value={comment} onChange={(e) => setComment(e.target.value)} placeholder={t('Delivery, quality, price')} />
       </label>
       <div className="row-wrap" style={{ marginTop: 12 }}>
-        <button className="primary" disabled={busy}>{busy ? 'Sending...' : 'Send rating'}</button>
-        <button type="button" className="secondary" onClick={onCancel}>Cancel</button>
+        <button className="primary" disabled={busy}>{busy ? t('Sending...') : t('Send rating')}</button>
+        <button type="button" className="secondary" onClick={onCancel}>{t('cancel')}</button>
       </div>
     </form>
   );
 }
 
 export default function Marketplace() {
+  const { t } = useLang();
   const [suppliers, setSuppliers] = useState([]);
   const [products, setProducts] = useState([]);
   const [ratings, setRatings] = useState({});
@@ -64,12 +67,12 @@ export default function Marketplace() {
     <>
       <div className="page-head">
         <div>
-          <p className="eyebrow">SUPPLIER SHOP</p>
-          <h1>Source smarter.</h1>
-          <p className="muted">Browse supplier listings and see how other farmers rate them before you commit your next farm purchase.</p>
+          <p className="eyebrow">{t('SUPPLIER SHOP')}</p>
+          <h1>{t('Source smarter.')}</h1>
+          <p className="muted">{t('Browse supplier listings and see how other farmers rate them before you commit your next farm purchase.')}</p>
         </div>
         <select className="filter" value={selected} onChange={(e) => setSelected(e.target.value)}>
-          <option value="all">All suppliers</option>
+          <option value="all">{t('All suppliers')}</option>
           {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
       </div>
@@ -78,8 +81,8 @@ export default function Marketplace() {
         {error && <div className="error" style={{ marginBottom: 14 }}>{error}</div>}
         {notice && <div className="notice" style={{ margin: '0 0 14px' }} role="status">{notice}</div>}
         {rating && <RateSupplier supplier={rating} onCancel={() => setRating(null)}
-          onDone={() => { setRating(null); setNotice('Thanks, your rating was saved.'); loadRatings(suppliers); }} />}
-        {reviewing && <ReviewsPanel type="SUPPLIER" id={reviewing.id} title={`Reviews of ${reviewing.name}`} onClose={() => setReviewing(null)} />}
+          onDone={() => { setRating(null); setNotice(t('Thanks, your rating was saved.')); loadRatings(suppliers); }} />}
+        {reviewing && <ReviewsPanel type="SUPPLIER" id={reviewing.id} title={t('Reviews of {name}', { name: reviewing.name })} onClose={() => setReviewing(null)} />}
 
         <div className="product-grid">
           {products.map((p) => {
@@ -89,19 +92,19 @@ export default function Marketplace() {
               <article className="product-card" key={p.id}>
                 <div className="product-art">▧</div>
                 <div className="product-body">
-                  <span className="tag">INPUT</span>
+                  <span className="tag">{t('INPUT')}</span>
                   <h3>{p.productName}</h3>
-                  <p style={{ marginBottom: 6 }}>{s?.name || 'Supplier'}{s?.location ? `, ${s.location}` : ''}</p>
+                  <p style={{ marginBottom: 6 }}>{s?.name || t('Supplier')}{s?.location ? `, ${s.location}` : ''}</p>
                   <p style={{ marginBottom: 12 }}>
                     <Stars value={r?.average} count={r?.count || 0} />{' '}
-                    {s && <button type="button" className="link-btn" onClick={() => setReviewing(s)}>Reviews</button>}
+                    {s && <button type="button" className="link-btn" onClick={() => setReviewing(s)}>{t('Reviews')}</button>}
                   </p>
-                  {contactOf === p.id && <p style={{ marginBottom: 12 }}>Contact: <strong>{s?.contact || 'Not listed'}</strong></p>}
+                  {contactOf === p.id && <p style={{ marginBottom: 12 }}>{t('Contact:')} <strong>{s?.contact || t('Not listed')}</strong></p>}
                   <div className="product-foot">
                     <strong>{money(p.price)}</strong>
                     <span className="row-wrap">
-                      <button className="secondary" onClick={() => setContactOf(contactOf === p.id ? null : p.id)}>Contact</button>
-                      {s && <button className="secondary" onClick={() => { setNotice(''); setRating(s); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Rate</button>}
+                      <button className="secondary" onClick={() => setContactOf(contactOf === p.id ? null : p.id)}>{t('Contact')}</button>
+                      {s && <button className="secondary" onClick={() => { setNotice(''); setRating(s); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>{t('Rate')}</button>}
                     </span>
                   </div>
                 </div>
@@ -110,7 +113,7 @@ export default function Marketplace() {
           })}
         </div>
         {!products.length && !error && (
-          <div className="empty"><span>▧</span><b>No supplier products yet</b><p>No supplier has listed products yet. Suppliers can add theirs in the Supplier Portal.</p></div>
+          <div className="empty"><span className="empty-icon">▧</span><b>{t('No supplier products yet')}</b><p>{t('No supplier has listed products yet. Suppliers can add theirs in the Supplier Portal.')}</p></div>
         )}
       </div>
     </>

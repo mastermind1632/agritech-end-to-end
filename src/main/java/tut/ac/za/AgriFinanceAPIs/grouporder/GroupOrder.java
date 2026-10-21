@@ -11,6 +11,14 @@ public class GroupOrder {
  @Column(name="current_quantity",nullable=false) private Integer currentQuantity=0;
  @Column(name="discount_rate",precision=5,scale=2) private BigDecimal discountRate=BigDecimal.ZERO;
  @Column(name="created_at",nullable=false) private LocalDateTime createdAt;
+ /** Who started the group order. They (or the supplier's owner, or an admin) may close it. */
+ @Column(name="created_by",length=36) private String createdBy;
+ /** Optional closing time; open orders past their deadline are closed automatically as "expired". */
+ @Column(name="deadline") private LocalDateTime deadline;
+ @Column(name="closed_at") private LocalDateTime closedAt;
+ public String getCreatedBy(){return createdBy;} public void setCreatedBy(String v){createdBy=v;}
+ public LocalDateTime getDeadline(){return deadline;} public void setDeadline(LocalDateTime v){deadline=v;}
+ public LocalDateTime getClosedAt(){return closedAt;} public void setClosedAt(LocalDateTime v){closedAt=v;}
  @PrePersist public void prePersist(){if(id==null)id=UUID.randomUUID().toString();if(createdAt==null)createdAt=LocalDateTime.now();if(status==null)status="open";if(currentQuantity==null)currentQuantity=0;if(discountRate==null)discountRate=BigDecimal.ZERO;}
  public String getId(){return id;} public void setId(String v){id=v;}
  public String getProductId(){return productId;} public void setProductId(String v){productId=v;}

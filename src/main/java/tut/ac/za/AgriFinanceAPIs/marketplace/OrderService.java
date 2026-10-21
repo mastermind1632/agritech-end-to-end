@@ -9,6 +9,7 @@ import tut.ac.za.AgriFinanceAPIs.farmer.FarmerRepository;
 import tut.ac.za.AgriFinanceAPIs.finance.Income;
 import tut.ac.za.AgriFinanceAPIs.finance.IncomeRepository;
 import tut.ac.za.AgriFinanceAPIs.marketplace.OrderDtos.*;
+import tut.ac.za.AgriFinanceAPIs.notification.NotificationHub;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -45,10 +46,14 @@ public class OrderService {
     private final IncomeRepository incomes;
     private final ListingImageRepository images;
     private final MarketReviewRepository reviews;
+    private final MarketDisputeRepository disputes;
+    private final DisputeService disputeService;
+    private final NotificationHub notifications;
 
     public OrderService(MarketOrderRepository orders, MarketOrderEventRepository events, ListingRepository listings,
                         FarmerRepository farmers, IncomeRepository incomes,
-                        ListingImageRepository images, MarketReviewRepository reviews) {
+                        ListingImageRepository images, MarketReviewRepository reviews,
+                        MarketDisputeRepository disputes, DisputeService disputeService, NotificationHub notifications) {
         this.orders = orders;
         this.events = events;
         this.listings = listings;
@@ -56,6 +61,9 @@ public class OrderService {
         this.incomes = incomes;
         this.images = images;
         this.reviews = reviews;
+        this.disputes = disputes;
+        this.disputeService = disputeService;
+        this.notifications = notifications;
     }
 
     // ---------- buyer places an order ----------
@@ -104,6 +112,8 @@ public class OrderService {
         o.setDeliveryNote(blankToNull(req.note()));
         orders.save(o);
         log(o, buyerId, null, "PENDING", "Order placed");
+        notifications.notify(o.getSellerId(), "ORDER", "New order: " + qty.stripTrailingZeros().toPlainString() + " " + o.getUnit() + " " + o.getProduct(),
+                "R" + total.toPlainString() + " cash on delivery. Accept or decline it in Farm Market > Orders.", "farmmarket");
         return view(o, buyerId, false);
     }
 
@@ -129,6 +139,8 @@ public class OrderService {
         o.setDeliveryCode(String.format("%06d", RANDOM.nextInt(1_000_000)));
         o.setConfirmedAt(LocalDateTime.now());
         move(o, "CONFIRMED", actor, "Farmer accepted the order; stock reserved");
+        notifications.notify(o.getBuyerId(), "ORDER", "Order #" + o.getId() + " accepted",
+                "The farmer accepted your order for " + o.getProduct() + ". Your one-time delivery code is in Farm Market > My orders. Give it to the farmer only when you receive the produce.", "farmmarket");
         return view(o, actor, false);
     }
 
@@ -138,6 +150,7 @@ public class OrderService {
         requireSeller(o, actor);
         requireStatus(o, "PENDING");
         move(o, "DECLINED", actor, noteOf("Farmer declined", reason));
+        notifications.notify(o.getBuyerId(), "ORDER", "Order #" + o.getId() + " declined", noteOf("The farmer declined your order", reason), "farmmarket");
         return view(o, actor, false);
     }
 
@@ -148,6 +161,8 @@ public class OrderService {
         requireStatus(o, "CONFIRMED");
         o.setDispatchedAt(LocalDateTime.now());
         move(o, "DISPATCHED", actor, "Produce is on its way");
+        notifications.notify(o.getBuyerId(), "ORDER", "Order #" + o.getId() + " is on its way",
+                o.getProduct() + " has been dispatched. Have your delivery code ready.", "farmmarket");
         return view(o, actor, false);
     }
 
@@ -172,6 +187,8 @@ public class OrderService {
         o.setDeliveredLat(req.latitude());
         o.setDeliveredLng(req.longitude());
         move(o, "DELIVERED", actor, "Delivery confirmed with the buyer's code");
+        notifications.notify(o.getBuyerId(), "ORDER", "Order #" + o.getId() + " delivered",
+                "Please confirm in the app once you have paid the farmer in cash.", "farmmarket");
         return view(o, actor, false);
     }
 
@@ -188,6 +205,8 @@ public class OrderService {
 
         releaseStock(o);
         move(o, "CANCELLED", actor, noteOf(buyer ? "Buyer cancelled" : "Farmer cancelled", reason));
+        notifications.notify(buyer ? o.getSellerId() : o.getBuyerId(), "ORDER", "Order #" + o.getId() + " was cancelled",
+                noteOf(buyer ? "The buyer cancelled" : "The farmer cancelled", reason), "farmmarket");
         return view(o, actor, false);
     }
 
@@ -211,7 +230,12 @@ public class OrderService {
             income.setItem(item.length() > 150 ? item.substring(0, 150) : item);
             income.setAmount(o.getTotalAmount());
             income.setDate(LocalDate.now());
+            income.setSource("MARKETPLACE");
             incomes.save(income);
+            String done = "Order #" + o.getId() + " is complete. You can now rate each other.";
+            notifications.notify(o.getBuyerId(), "ORDER", "Order #" + o.getId() + " completed", done, "farmmarket");
+            notifications.notify(o.getSellerId(), "ORDER", "Order #" + o.getId() + " completed",
+                    "R" + o.getTotalAmount().toPlainString() + " was recorded as income in My Finances.", "finance");
         } else {
             orders.save(o);
             log(o, actor, "DELIVERED", "DELIVERED", buyer ? "Buyer confirmed cash paid" : "Farmer confirmed cash received");
@@ -305,9 +329,18 @@ public class OrderService {
             thumbs.putIfAbsent((Long) row[1], (Long) row[0]);
         }
         Set<Long> reviewed = new HashSet<>(reviews.reviewedOrderIds(orderIds, "FARMER"));
+        Map<Long, List<MarketDispute>> disputesByOrder = disputes.findByOrderIdInOrderByCreatedAtDesc(orderIds).stream()
+                .collect(Collectors.groupingBy(MarketDispute::getOrderId));
+        Map<String, Integer> reliability = new HashMap<>();
+        for (MarketOrder o : list) {
+            if (viewer.equals(o.getSellerId()) && !reliability.containsKey(o.getBuyerId())) {
+                reliability.put(o.getBuyerId(), disputeService.buyerReliability(o.getBuyerId()));
+            }
+        }
 
         return list.stream().map(o -> build(o, viewer, people, byOrder.getOrDefault(o.getId(), List.of()),
-                thumbs.get(o.getListingId()), reviewed.contains(o.getId()))).toList();
+                thumbs.get(o.getListingId()), reviewed.contains(o.getId()),
+                disputesByOrder.getOrDefault(o.getId(), List.of()), reliability.get(o.getBuyerId()))).toList();
     }
 
     private OrderView view(MarketOrder o, String viewer, boolean withEvents) {
@@ -331,14 +364,15 @@ public class OrderService {
     }
 
     private OrderView build(MarketOrder o, String viewer, Map<String, Farmer> people, List<MarketOrderEvent> es,
-                            Long imageId, boolean reviewed) {
+                            Long imageId, boolean reviewed, List<MarketDispute> orderDisputes, Integer buyerReliability) {
+        MarketDispute openDispute = orderDisputes.stream().filter(MarketDispute::isOpen).findFirst().orElse(null);
         boolean isBuyer = viewer.equals(o.getBuyerId());
         boolean isSeller = viewer.equals(o.getSellerId());
         String role = isBuyer ? "BUYER" : isSeller ? "SELLER" : "ADMIN";
         String s = o.getStatus();
 
         // Phone numbers are only shared once the farmer has accepted, and only with the other party.
-        boolean contactsOpen = Set.of("CONFIRMED", "DISPATCHED", "DELIVERED", "COMPLETED").contains(s);
+        boolean contactsOpen = Set.of("CONFIRMED", "DISPATCHED", "DELIVERED", "COMPLETED", "DISPUTED").contains(s);
         Farmer buyer = people.get(o.getBuyerId());
         Farmer seller = people.get(o.getSellerId());
         String buyerContact = contactsOpen && !isBuyer && buyer != null ? buyer.getContact() : null;
@@ -363,6 +397,8 @@ public class OrderService {
             }
         }
 
+        if (DisputeService.canRaise(o, viewer, openDispute != null)) actions.add("dispute");
+
         List<EventView> eventViews = es.stream().map(e -> new EventView(
                 e.getActorId() == null ? "System" : people.containsKey(e.getActorId()) ? people.get(e.getActorId()).getName() : "Farmer",
                 e.getFromStatus(), e.getToStatus(), e.getNote(), e.getCreatedAt())).toList();
@@ -378,7 +414,9 @@ public class OrderService {
                 o.getSellerId(), seller != null ? seller.getName() : "Farmer", sellerContact,
                 o.getDeliveryNote(), code, o.isBuyerConfirmedPaid(), o.isSellerConfirmedPaid(), actions,
                 o.getCreatedAt(), o.getUpdatedAt(), o.getDeliveredAt(), o.getCompletedAt(),
-                imageId, cost, profit, reviewed, canReview, eventViews);
+                imageId, cost, profit, reviewed, canReview, eventViews,
+                isSeller ? buyerReliability : null, openDispute == null ? null : openDispute.getId(),
+                orderDisputes.isEmpty() ? null : orderDisputes.get(0).getId());
     }
 
     private static String noteOf(String base, String reason) {

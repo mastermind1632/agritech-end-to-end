@@ -28,6 +28,14 @@ public class Expense {
     @Column(nullable = false)
     private LocalDate date;
 
+    /** Crop or block this cost belongs to (feeds cost per crop and the business budget). */
+    @Column(length = 60)
+    private String crop;
+
+    /** Where the record came from: null (typed in) or STATEMENT. */
+    @Column(length = 20)
+    private String source;
+
     public Expense() {
     }
 
@@ -54,5 +62,9 @@ public class Expense {
     public void setAmount(BigDecimal amount) { this.amount = amount; }
 
     public LocalDate getDate() { return date; }
+    public String getCrop() { return crop; }
+    public void setCrop(String crop) { this.crop = crop; }
+    public String getSource() { return source; }
+    public void setSource(String source) { this.source = source; }
     public void setDate(LocalDate date) { this.date = date; }
 }

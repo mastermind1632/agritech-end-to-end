@@ -40,8 +40,12 @@ public class JwtService {
     public TokenInfo parse(String token) {
         Claims claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
         String role = claims.get("role", String.class);
-        // Only two known roles; anything else (or an old token without a role) is a plain farmer.
-        return new TokenInfo(claims.getSubject(), "ADMIN".equals(role) ? "ADMIN" : "FARMER");
+        // Known roles only; anything else (or an old token without a role) is a plain farmer.
+        return new TokenInfo(claims.getSubject(), tut.ac.za.AgriFinanceAPIs.common.Roles.normalise(role));
+    }
+
+    public long expirationSeconds() {
+        return expirationSeconds;
     }
 
     public String subject(String token) {

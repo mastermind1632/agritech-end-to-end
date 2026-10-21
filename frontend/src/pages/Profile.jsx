@@ -3,6 +3,9 @@ import Avatar, { avatarChanged } from '../components/Avatar';
 import { avatarApi } from '../lib/api';
 import ProductionProfile from '../components/ProductionProfile';
 import '../market-intelligence.css';
+import useLang from '../hooks/useLang';
+import { tr } from '../lib/i18n';
+import { ROLE_LABEL } from '../components/Layout';
 
 const OK_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -18,11 +21,12 @@ async function prepare(file) {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
   const blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.88));
-  if (!blob) throw new Error('We could not read that photo. Please try a different one.');
+  if (!blob) throw new Error(tr('We could not read that photo. Please try a different one.'));
   return new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
 }
 
-export default function Profile({ farmer, onProductionSaved }) {
+export default function Profile({ farmer, onProductionSaved, setPage }) {
+  const { t } = useLang();
   const input = useRef(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -33,14 +37,14 @@ export default function Profile({ farmer, onProductionSaved }) {
     e.target.value = '';
     if (!file) return;
     setError(''); setOk('');
-    if (!OK_TYPES.includes(file.type)) { setError('Please choose a JPEG, PNG or WebP image.'); return; }
+    if (!OK_TYPES.includes(file.type)) { setError(t('Please choose a JPEG, PNG or WebP image.')); return; }
     setBusy(true);
     try {
       await avatarApi.upload(farmer.id, await prepare(file));
       avatarChanged(farmer.id);
-      setOk('Profile photo updated.');
+      setOk(t('Profile photo updated.'));
     } catch (err) {
-      setError(err.message || 'Upload failed');
+      setError(err.message || t('Upload failed'));
     } finally {
       setBusy(false);
     }
@@ -51,9 +55,9 @@ export default function Profile({ farmer, onProductionSaved }) {
     try {
       await avatarApi.remove(farmer.id);
       avatarChanged(farmer.id);
-      setOk('Profile photo removed.');
+      setOk(t('Profile photo removed.'));
     } catch (err) {
-      setError(err.message || 'Could not remove photo');
+      setError(err.message || t('Could not remove photo'));
     } finally {
       setBusy(false);
     }
@@ -63,29 +67,30 @@ export default function Profile({ farmer, onProductionSaved }) {
     <>
       <div className="page-head">
         <div>
-          <p className="eyebrow">ACCOUNT</p>
-          <h1>Farmer profile</h1>
-          <p className="muted">Your name, location and photo.</p>
+          <p className="eyebrow">{t('account')}</p>
+          <h1>{t('Farmer profile')}</h1>
+          <p className="muted">{t('Your photo and what you produce. Change your name, language, alerts, password and privacy choices in Settings.')}</p>
         </div>
+        <button className="secondary" onClick={() => setPage?.('settings')}>{t('Account settings')}</button>
       </div>
       {ok && <div className="notice">{ok}</div>}
       {error && <div className="error" style={{ margin: '0 48px 16px' }}>{error}</div>}
       <section className="profile-card">
         <Avatar id={farmer.id} name={farmer.name} size={96} />
         <div>
-          <span className="tag">FARMER ACCOUNT</span>
+          <span className="tag">{t('{role} ACCOUNT', { role: t(ROLE_LABEL[farmer.role || 'FARMER'] || farmer.role).toUpperCase() })}</span>
           <h2>{farmer.name}</h2>
-          <p>{farmer.location || 'Location not provided'} | {farmer.contact}</p>
+          <p>{farmer.location || t('Location not provided')} | {farmer.contact}</p>
           <div className="profile-actions">
             <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={pick} />
             <button className="primary" disabled={busy} onClick={() => input.current.click()}>
-              {busy ? 'Working...' : 'Upload photo'}
+              {busy ? t('Working...') : t('Upload photo')}
             </button>
-            <button className="secondary" disabled={busy} onClick={remove}>Remove photo</button>
+            <button className="secondary" disabled={busy} onClick={remove}>{t('Remove photo')}</button>
           </div>
         </div>
       </section>
-      <ProductionProfile onSaved={onProductionSaved} />
+      {(!farmer.role || farmer.role === 'FARMER') && <ProductionProfile onSaved={onProductionSaved} />}
     </>
   );
 }

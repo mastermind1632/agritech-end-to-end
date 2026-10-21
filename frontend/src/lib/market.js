@@ -1,3 +1,4 @@
+import { tr } from './i18n.js';
 import { api, TOKEN_KEY } from './api';
 
 const BASE = import.meta.env.VITE_API_URL || '/api';
@@ -31,9 +32,9 @@ export async function uploadListingImage(listingId, blob) {
     body: fd
   });
   if (!res.ok) {
-    let msg = 'We could not upload that photo. Please try again.';
+    let msg = tr('We could not upload that photo. Please try again.');
     try { msg = (await res.json()).message || msg; } catch { /* keep default */ }
-    throw new Error(msg);
+    throw new Error(tr(msg));
   }
   return res.json();
 }
@@ -50,9 +51,9 @@ export function shrinkImage(file, max = 1280, quality = 0.82) {
       canvas.width = Math.round(img.width * scale);
       canvas.height = Math.round(img.height * scale);
       canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not process that photo'))), 'image/jpeg', quality);
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error(tr('Could not process that photo')))), 'image/jpeg', quality);
     };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('That file is not a photo this browser can read')); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(tr('That file is not a photo this browser can read'))); };
     img.src = url;
   });
 }
@@ -85,23 +86,23 @@ export async function drivingEstimate(from, to) {
   }
 }
 
-export const formatMinutes = (m) => (m < 60 ? `${Math.round(m)} min` : `${Math.floor(m / 60)} h ${Math.round(m % 60)} min`);
+export const formatMinutes = (m) => (m < 60 ? tr('{m} min', { m: Math.round(m) }) : tr('{h} h {m} min', { h: Math.floor(m / 60), m: Math.round(m % 60) }));
 
 /** Finds a place in South Africa by name using OpenStreetMap's Nominatim (free; one request per button press). */
 export async function geocode(query) {
   const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=za&q=${encodeURIComponent(query)}`,
     { headers: { Accept: 'application/json' } });
-  if (!res.ok) throw new Error('Place search is busy right now. Please try again in a moment.');
+  if (!res.ok) throw new Error(tr('Place search is busy right now. Please try again in a moment.'));
   const data = await res.json();
-  if (!data.length) throw new Error('We could not find that place. Try the name of a nearby town.');
+  if (!data.length) throw new Error(tr('We could not find that place. Try the name of a nearby town.'));
   return { lat: Number(data[0].lat), lng: Number(data[0].lon), label: data[0].display_name };
 }
 
 /** Browser location. It only works on https or localhost, so on a phone using http://192.168... it will be blocked. */
 export function getPosition(onOk, onFail) {
-  if (!navigator.geolocation) return onFail('Your browser cannot share your location. Type a town instead.');
+  if (!navigator.geolocation) return onFail(tr('Your browser cannot share your location. Type a town instead.'));
   navigator.geolocation.getCurrentPosition(
     (p) => onOk(p.coords.latitude, p.coords.longitude),
-    () => onFail('We could not get your location. Allow location access in your browser, or type a town instead.')
+    () => onFail(tr('We could not get your location. Allow location access in your browser, or type a town instead.'))
   );
 }

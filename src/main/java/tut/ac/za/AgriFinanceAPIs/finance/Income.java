@@ -25,6 +25,10 @@ public class Income {
     @Column(nullable = false)
     private LocalDate date;
 
+    /** Where the record came from: null (typed in), MARKETPLACE or STATEMENT. */
+    @Column(length = 20)
+    private String source;
+
     public Income() {
     }
 
@@ -48,5 +52,7 @@ public class Income {
     public void setAmount(BigDecimal amount) { this.amount = amount; }
 
     public LocalDate getDate() { return date; }
+    public String getSource() { return source; }
+    public void setSource(String source) { this.source = source; }
     public void setDate(LocalDate date) { this.date = date; }
 }

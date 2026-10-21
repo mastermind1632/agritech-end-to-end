@@ -35,7 +35,28 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       APP_JWT_SECRET: ${APP_JWT_SECRET:-change-this-to-a-long-random-production-secret-at-least-32-chars}
-      SPRING_JPA_DDL_AUTO: update
+      # Flyway owns the schema; Hibernate only validates it.
+      SPRING_JPA_DDL_AUTO: ${SPRING_JPA_DDL_AUTO:-validate}
+      DOCUMENT_SERVICE_URL: http://document-service:8003
+      APP_PUBLIC_URL: http://localhost:${FRONTEND_PORT:-3000}
+      APP_VAULT_KEY: ${APP_VAULT_KEY:-}
+      APP_ADMIN_CONTACT: ${APP_ADMIN_CONTACT:-}
+      APP_ADMIN_PASSWORD: ${APP_ADMIN_PASSWORD:-}
+      # Local demos: fictional accounts and data, and reset links shown on screen instead of emailed.
+      APP_DEMO_SEED: ${APP_DEMO_SEED:-false}
+      APP_DEV_SHOW_RESET_LINK: ${APP_DEV_SHOW_RESET_LINK:-false}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+      AFRICASTALKING_USERNAME: ${AFRICASTALKING_USERNAME:-}
+      AFRICASTALKING_API_KEY: ${AFRICASTALKING_API_KEY:-}
+
+  # Reads PDF statements (text layer) and scans/photos (Tesseract OCR). Internal only; nothing is stored.
+  document-service:
+    build: ./document-service
+    container_name: agritech-documents
+    restart: unless-stopped
 
   frontend:
     build: ./frontend

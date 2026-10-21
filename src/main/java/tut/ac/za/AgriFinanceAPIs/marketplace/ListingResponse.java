@@ -35,4 +35,6 @@ public record ListingResponse(
         Double sellerRating,
         long sellerRatingCount,
         Double productRating,
-        long productRatingCount) { }
+        long productRatingCount,
+        boolean sellerVerified,       // business registration checked by an admin (Business Companion)
+        boolean sellerExportReady) { } // completed an export-readiness plan up to inspection

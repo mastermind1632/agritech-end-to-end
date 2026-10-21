@@ -21,4 +21,24 @@ public interface MarketOrderRepository extends JpaRepository<MarketOrder, Long> 
     List<MarketOrder> findBySellerIdOrderByCreatedAtDesc(String sellerId);
 
     long countByBuyerIdAndStatus(String buyerId, String status);
+
+    long countBySellerIdAndStatus(String sellerId, String status);
+
+    long countByStatus(String status);
+
+    /** Rows of [unit, average sold price, count] for completed sales of a product since a date. */
+    @Query("select o.unit, avg(o.pricePerUnit), count(o) from MarketOrder o where o.status = 'COMPLETED' "
+            + "and lower(o.product) like :pattern and o.completedAt >= :since group by o.unit")
+    List<Object[]> soldPrices(@Param("pattern") String pattern, @Param("since") java.time.LocalDateTime since);
+
+    /** Rows of [product, unit, average sold price, count] for completed sales since a date. */
+    @Query("select lower(o.product), o.unit, avg(o.pricePerUnit), count(o) from MarketOrder o where o.status = 'COMPLETED' "
+            + "and o.completedAt >= :since group by lower(o.product), o.unit")
+    List<Object[]> soldBoard(@Param("since") java.time.LocalDateTime since);
+
+    @Query("select sum(o.totalAmount) from MarketOrder o where o.status = 'COMPLETED'")
+    java.math.BigDecimal completedValue();
+
+    /** Completed sales to match against bank credits (so a sale is not counted twice). */
+    List<MarketOrder> findBySellerIdAndStatusAndCompletedAtAfter(String sellerId, String status, java.time.LocalDateTime after);
 }

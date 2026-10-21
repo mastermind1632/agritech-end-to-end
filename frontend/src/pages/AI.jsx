@@ -3,8 +3,10 @@ import { assistantApi, recommendationApi } from '../lib/api';
 import { hasRecordedActivity, summarizeMatches, spendingAlert } from '../lib/farmerInsights';
 import '../ai.css';
 import BuyingOpportunity from '../components/BuyingOpportunity';
+import useLang from '../hooks/useLang';
 
 export default function AI({ farmer, setPage, reviewOrder }) {
+  const { t } = useLang();
   const [items, setItems] = useState([]);
   const [messages, setMessages] = useState([]);
   const [question, setQuestion] = useState('');
@@ -137,69 +139,68 @@ export default function AI({ farmer, setPage, reviewOrder }) {
     finally { setRefreshing(false); }
   };
   return <>
-    <div className="page-head"><div><p className="eyebrow">YOUR FARM</p><h1>Farm advice and buying insights</h1></div></div>
+    <div className="page-head"><div><p className="eyebrow">{t('YOUR FARM')}</p><h1>{t('Farm advice and buying insights')}</h1></div></div>
     <section className="farm-assistant" aria-labelledby="assistant-title">
-      <div className="farm-section-head"><h2 id="assistant-title">Ask about your farm</h2>
+      <div className="farm-section-head"><h2 id="assistant-title">{t('Ask about your farm')}</h2>
         <button className="secondary" onClick={clearConversation} disabled={sending || starting}
-          title="Delete this conversation and start a new one">Clear conversation</button></div>
+          title={t('Delete this conversation and start a new one')}>{t('Clear conversation')}</button></div>
       <div className="farm-messages" aria-live="polite" aria-busy={sending}>
-        {messages.length === 0 && !approval && !starting && <p className="muted">What would you like to ask about seeds, farm costs or group buying?</p>}
+        {messages.length === 0 && !approval && !starting && <p className="muted">{t('What would you like to ask about seeds, farm costs or group buying?')}</p>}
         {messages.map((message, index) => <article className={`farm-message ${message.role}`} key={index}>
-          <strong>{message.role === 'user' ? 'You' : 'Farm assistant'}</strong><p>{message.text}</p>
-          {!!message.sources?.length && <details className="farm-source-details"><summary>Sources ({message.sources.length})</summary><ul className="farm-sources">{message.sources.map(source => <li key={source.id}>
+          <strong>{message.role === 'user' ? t('You') : t('Farm assistant')}</strong><p>{message.text}</p>
+          {!!message.sources?.length && <details className="farm-source-details"><summary>{t('Sources ({n})', { n: message.sources.length })}</summary><ul className="farm-sources">{message.sources.map(source => <li key={source.id}>
             {source.url?.startsWith('https://') ? <a href={source.url} target="_blank" rel="noreferrer">{source.title}</a> : source.title}
             {source.region && <small>{source.region}</small>}
-            {source.checkedOn && <small>Source checked: {source.checkedOn}</small>}
-            {source.reviewStatus && <small>{source.reviewStatus}</small>}
+            {source.checkedOn && <small>{t('Source checked:')} {source.checkedOn}</small>}
+            {source.reviewStatus && <small>{t(source.reviewStatus)}</small>}
           </li>)}</ul></details>}
         </article>)}
-        {sending && <p role="status">Thinking...</p>}
-        {starting && <p role="status">Loading your conversation...</p>}
+        {sending && <p role="status" className="thinking">{t('Thinking...')}</p>}
+        {starting && <p role="status">{t('Loading your conversation...')}</p>}
         {approval && <section className="farm-approval" aria-labelledby="approval-title">
-          <h3 id="approval-title">Review required</h3>
-          <p>{approval.productName}: {approval.quantity} units</p>
-          <p>Listed total: R {Number(approval.quote.listedTotal).toFixed(2)}.
-            With the unconfirmed group discount: R {Number(approval.quote.indicativeGroupTotal).toFixed(2)}.</p>
-          <p>{approval.notice}</p>
+          <h3 id="approval-title">{t('Review required')}</h3>
+          <p>{approval.productName}: {t('{n} units', { n: approval.quantity })}</p>
+          <p>{t('Listed total: R {listed}. With the unconfirmed group discount: R {group}.', { listed: Number(approval.quote.listedTotal).toFixed(2), group: Number(approval.quote.indicativeGroupTotal).toFixed(2) })}</p>
+          <p>{t(approval.notice)}</p>
           <div className="farm-approval-actions"><button className="primary" disabled={sending}
-            onClick={() => resolveApproval(true)}>Continue to order review</button>
-            <button className="secondary" disabled={sending} onClick={() => resolveApproval(false)}>Cancel review</button></div>
+            onClick={() => resolveApproval(true)}>{t('Continue to order review')}</button>
+            <button className="secondary" disabled={sending} onClick={() => resolveApproval(false)}>{t('Cancel review')}</button></div>
         </section>}
       </div>
       {chatError && <p className="farm-error" role="alert">{chatError}</p>}
       <form className="farm-question" onSubmit={send}>
-        <label className="farm-input"><span>Your question</span><input value={question} onChange={e => setQuestion(e.target.value)} maxLength={2000} disabled={sending || starting || !conversationId || !!approval} required /></label>
-        <button className="primary" disabled={sending || starting || !conversationId || !!approval || !question.trim()}>{sending ? 'Waiting...' : 'Ask'}</button>
+        <label className="farm-input"><span>{t('Your question')}</span><input value={question} onChange={e => setQuestion(e.target.value)} maxLength={2000} disabled={sending || starting || !conversationId || !!approval} required /></label>
+        <button className="primary" disabled={sending || starting || !conversationId || !!approval || !question.trim()}>{sending ? t('Waiting...') : t('Ask')}</button>
       </form>
     </section>
     <section className="farm-insights" aria-busy={loading}>
-      <div className="farm-section-head"><h2>Your farm comparisons</h2><button className="secondary" onClick={load} disabled={loading}>{loading ? 'Loading...' : 'Refresh comparisons'}</button></div>
+      <div className="farm-section-head"><h2>{t('Your farm comparisons')}</h2><button className="secondary" onClick={load} disabled={loading}>{loading ? t('loading') : t('Refresh comparisons')}</button></div>
       {error && <p className="farm-error" role="alert">{error}</p>}
       {!loading && insights && <>
         {hasRecordedActivity(insights.alerts.farmer) ? <>
           <dl className="farm-comparison-totals">
-            <div><dt>Similar overall spending patterns</dt><dd>{insights.group.otherFarmers} other {insights.group.otherFarmers === 1 ? 'farm' : 'farms'}</dd></div>
-            <div><dt>Buying activity in common</dt><dd>{insights.similar.length} {insights.similar.length === 1 ? 'match' : 'matches'}</dd></div>
+            <div><dt>{t('Similar overall spending patterns')}</dt><dd>{t(insights.group.otherFarmers === 1 ? '{n} other farm' : '{n} other farms', { n: insights.group.otherFarmers })}</dd></div>
+            <div><dt>{t('Buying activity in common')}</dt><dd>{t(insights.similar.length === 1 ? '{n} match' : '{n} matches', { n: insights.similar.length })}</dd></div>
           </dl>
           {insights.similar.length ? <ul className="farm-match-summary">{summarizeMatches(insights.similar).map(summary => <li key={summary.label}>
-            <span>{summary.label}</span><strong>{summary.count} {summary.count === 1 ? 'farm' : 'farms'}</strong>
-          </li>)}</ul> : <p className="muted">No farms with shared buying activity found yet.</p>}
-          <button className="secondary" onClick={() => setPage('groups')}>Browse open group orders</button>
-        </> : <p className="muted">No expense or group-order records available for a comparison.</p>}
-        {hasRecordedActivity(insights.alerts.farmer) && <><h3>Spending to review</h3>
+            <span>{summary.label}</span><strong>{t(summary.count === 1 ? '{n} farm' : '{n} farms', { n: summary.count })}</strong>
+          </li>)}</ul> : <p className="muted">{t('No farms with shared buying activity found yet.')}</p>}
+          <button className="secondary" onClick={() => setPage('groups')}>{t('Browse open group orders')}</button>
+        </> : <p className="muted">{t('No expense or group-order records available for a comparison.')}</p>}
+        {hasRecordedActivity(insights.alerts.farmer) && <><h3>{t('Spending to review')}</h3>
         {insights.alerts.anomalies.length ? <ul className="farm-comparisons">{insights.alerts.anomalies.map((alert, index) => {
           const copy = spendingAlert(alert);
           return <li key={index}><strong>{copy.title}</strong><p>{copy.comparison}</p><p>{copy.action}</p></li>;
-        })}</ul> : <p className="muted">No unusual spending flagged in your current records.</p>}</>}
+        })}</ul> : <p className="muted">{t('No unusual spending flagged in your current records.')}</p>}</>}
       </>}
     </section>
     <section className="farm-insights">
-      <div className="farm-section-head"><h2>Group-buying opportunities</h2><button className="primary" onClick={generate} disabled={refreshing}>{refreshing ? 'Checking...' : 'Find opportunities'}</button></div>
+      <div className="farm-section-head"><h2>{t('Group-buying opportunities')}</h2><button className="primary" onClick={generate} disabled={refreshing}>{refreshing ? t('Checking...') : t('Find opportunities')}</button></div>
       {opportunityError && <p className="farm-error" role="alert">{opportunityError}</p>}
       {items.length ? <div className="buying-opportunities">{items.map(item =>
         <BuyingOpportunity key={item.id} item={item} reviewOrder={reviewOrder} requestReview={requestReview}
           reviewDisabled={sending || starting || !conversationId || !!approval} />)}</div>
-        : !opportunityError && <p className="muted">{loading ? 'Loading buying opportunities...' : 'No available group-buying opportunities right now.'} {!loading && <button className="text-button" onClick={() => setPage('groups')}>Browse group orders</button>}</p>}
+        : !opportunityError && <p className="muted">{loading ? t('Loading buying opportunities...') : t('No available group-buying opportunities right now.')} {!loading && <button className="text-button" onClick={() => setPage('groups')}>{t('Browse group orders')}</button>}</p>}
     </section>
   </>;
 }
