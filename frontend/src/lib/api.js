@@ -1,27 +1,41 @@
 // Default is a same-origin "/api": Vite proxies it to Spring Boot in development and nginx does the
 // same in Docker. (The old default of http://localhost:8080/api caused CORS failures in Docker.)
-const API = import.meta.env.VITE_API_URL || '/api';
+const API = import.meta.env?.VITE_API_URL || '/api';
 
 export const TOKEN_KEY = 'agritech_token';
 export const FARMER_KEY = 'agritech_farmer';
 
 export async function api(path, options = {}) {
   const token = localStorage.getItem(TOKEN_KEY);
-  let res;
+  const { timeoutMs = path.startsWith('/ai/conversations') || path === '/ai/chat' ? 240000 : 30000,
+    signal, ...requestOptions } = options;
+  const controller = new AbortController();
+  const cancel = () => controller.abort(signal.reason);
+  if (signal?.aborted) cancel();
+  else signal?.addEventListener('abort', cancel, { once: true });
+  let timedOut = false;
+  const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
+  let res, text;
   try {
     res = await fetch(`${API}${path}`, {
-      ...options,
+      ...requestOptions,
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(options.headers || {})
       }
     });
+    text = await res.text();
   } catch {
-    throw new Error('Cannot reach the server. Is the backend running on port 8080?');
+    if (timedOut) throw new Error('The server took too long to respond. Please try again.');
+    if (signal?.aborted) throw new Error('The request was cancelled.');
+    throw new Error('Cannot reach the server. Check your connection and try again.');
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener('abort', cancel);
   }
 
-  const text = await res.text();
   let data = null;
   try { data = text ? JSON.parse(text) : null } catch { data = text }
 

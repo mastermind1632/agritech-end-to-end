@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { intelligenceApi } from '../lib/api';
 
 const EMPTY = { crop: '', province: '', district: '', latitude: '', longitude: '', hectares: '', capacityKg: '',
@@ -6,6 +6,7 @@ const EMPTY = { crop: '', province: '', district: '', latitude: '', longitude: '
   consistentProduction: false, analyticsConsent: false, expenseConsent: false };
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const NUMBERS = ['latitude', 'longitude', 'hectares', 'capacityKg', 'plantingMonth', 'harvestMonth', 'deliveryRadiusKm'];
+const profileValues = profile => Object.fromEntries(Object.keys(EMPTY).map(k => [k, profile[k] ?? EMPTY[k]]));
 
 export default function ProductionProfile({ onSaved }) {
   const [form, setForm] = useState(EMPTY);
@@ -13,48 +14,61 @@ export default function ProductionProfile({ onSaved }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
+  const mounted = useRef(false);
   useEffect(() => {
     let active = true;
+    mounted.current = true;
     Promise.all([intelligenceApi.options(), intelligenceApi.profile()]).then(([o, p]) => {
       if (!active) return;
       setOptions(o);
-      if (p.profile) setForm(Object.fromEntries(Object.keys(EMPTY).map(k => [k, p.profile[k] ?? EMPTY[k]])));
+      if (p.profile) setForm(profileValues(p.profile));
     }).catch(e => { if (active) setError(e.message); });
-    return () => { active = false; };
+    return () => { active = false; mounted.current = false; };
   }, []);
   const change = e => setForm({ ...form, [e.target.name]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
   const save = async e => {
-    e.preventDefault(); setBusy(true); setError(''); setStatus('');
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true); setError(''); setStatus('');
     try {
       const body = { ...form };
       NUMBERS.forEach(k => { body[k] = Number(body[k]); });
-      await intelligenceApi.saveProfile(body);
+      const saved = await intelligenceApi.saveProfile(body);
+      if (!mounted.current) return;
+      if (saved?.profile) setForm(profileValues(saved.profile));
       setStatus('Production profile saved.');
       onSaved?.();
-    } catch (err) { setError(err.message); }
-    finally { setBusy(false); }
+    } catch (err) { if (mounted.current) setError(err.message); }
+    finally { if (mounted.current) setBusy(false); }
   };
   const remove = async () => {
+    if (busy) return;
     if (!window.confirm('Delete your production profile, produce listings and recommendation history?')) return;
-    setBusy(true); setError('');
-    try { await intelligenceApi.deleteProfile(); setForm(EMPTY); setStatus('Production data deleted.'); }
-    catch (err) { setError(err.message); }
-    finally { setBusy(false); }
+    setBusy(true); setError(''); setStatus('');
+    try {
+      await intelligenceApi.deleteProfile();
+      if (mounted.current) { setForm(EMPTY); setStatus('Production data deleted.'); }
+    }
+    catch (err) { if (mounted.current) setError(err.message); }
+    finally { if (mounted.current) setBusy(false); }
   };
   const gps = () => {
+    if (busy) return;
     if (!navigator.geolocation) { setError('Location access is unavailable. Enter coordinates manually.'); return; }
-    setBusy(true);
+    setBusy(true); setError(''); setStatus('');
     navigator.geolocation.getCurrentPosition(p => {
+      if (!mounted.current) return;
       setForm(f => ({ ...f, latitude: p.coords.latitude.toFixed(5), longitude: p.coords.longitude.toFixed(5) }));
       setBusy(false);
-    }, () => { setError('Could not get your location. Enter coordinates manually.'); setBusy(false); }, { timeout: 10000 });
+    }, () => { if (mounted.current) { setError('Could not get your location. Enter coordinates manually.'); setBusy(false); } }, { timeout: 10000 });
   };
   return <section className="production-section">
     <h2>Farm production</h2>
     {error && <p className="error" role="alert">{error}</p>}
     {status && <p className="notice" role="status">{status}</p>}
     {!options && !error && <p aria-live="polite">Loading production profile...</p>}
-    {options && <form onSubmit={save} className="production-form">
+    {options && <form onSubmit={save} className="production-form" aria-busy={busy}>
+      <fieldset disabled={busy} style={{ display: 'contents' }}>
       <label>Primary crop<select name="crop" value={form.crop} onChange={change} required><option value="">Select crop</option>{options.crops.map(c => <option key={c} value={c}>{c}</option>)}</select></label>
       <label>Province<select name="province" value={form.province} onChange={change} required><option value="">Select province</option>{options.provinces.map(p => <option key={p}>{p}</option>)}</select></label>
       <label>District<input name="district" value={form.district} onChange={change} required minLength={2} maxLength={100} /></label>
@@ -70,7 +84,8 @@ export default function ProductionProfile({ onSaved }) {
         <label><input type="checkbox" name="analyticsConsent" checked={form.analyticsConsent} onChange={change} /> I consent to my production profile and activity being used for shared segmentation and recommendation evaluation.</label>
         <label><input type="checkbox" name="expenseConsent" checked={form.expenseConsent} onChange={change} /> I consent to my monthly expense totals being used for private service recommendations. Individual transactions are not shared.</label>
       </div>
-      <div className="production-actions"><button type="submit" className="primary" disabled={busy}>{busy ? 'Saving...' : 'Save production profile'}</button><button type="button" className="secondary" onClick={gps} disabled={busy || !window.isSecureContext} title={window.isSecureContext ? 'Use browser location' : 'Browser location requires HTTPS; coordinates can be entered manually'}>Use current location</button><button type="button" className="secondary" onClick={remove} disabled={busy}>Delete production data</button></div>
+      <div className="production-actions"><button type="submit" className="primary" disabled={busy}>{busy ? 'Working...' : 'Save production profile'}</button><button type="button" className="secondary" onClick={gps} disabled={busy || !window.isSecureContext} title={window.isSecureContext ? 'Use browser location' : 'Browser location requires HTTPS; coordinates can be entered manually'}>Use current location</button><button type="button" className="secondary" onClick={remove} disabled={busy}>Delete production data</button></div>
+      </fieldset>
     </form>}
   </section>;
 }

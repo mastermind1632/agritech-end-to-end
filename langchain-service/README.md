@@ -25,7 +25,7 @@ python -m venv .venv
 
 Defaults: `OLLAMA_BASE_URL=http://localhost:11434`, `AI_MODEL=qwen2.5:0.5b`. Spring uses `AI_LANGCHAIN_URL=http://localhost:8001` outside Docker. Compose supplies internal service URLs. Keep both services on the same model tag.
 
-`GET /health` checks Ollama connectivity and identifies the framework. Internal `POST /api/generate` retains the existing non-streaming request/response shape, preserving Spring's retries and missing-model recovery. Model and generation limits are validated. The Docker overlay publishes no host ports for LangChain or Ollama; browsers call Spring through the existing authenticated `/api` proxy.
+`GET /health` verifies that Ollama can inspect the configured model and identifies the framework. It returns HTTP 503 when Ollama is unreachable or the configured model is missing, without generating text. Internal `POST /api/generate` retains the existing non-streaming request/response shape, preserving Spring's retries and missing-model recovery. Model and generation limits are validated. The Docker overlay publishes no host ports for LangChain or Ollama; browsers call Spring through the existing authenticated `/api` proxy.
 
 ## Scope
 

@@ -30,8 +30,16 @@ def route_for(question, previous_route=None, messages=()):
         return "finance"
     if re.search(r'\b(buyers?|sell|selling)\b|produce markets', text):
         return 'produce'
-    if re.search(r"\b(price|buy|purchase|order|supplier|discount|catalogue|marketplace)\b", text) or re.search(
-            r"\b(where|how)\b.*\b(get|find|source)\b.*\b(seeds?|fertilisers?|fertilizers?)\b|recommendations?|opportunities|recommend.*\b(products?|suppliers?|seeds?)\b", text):
+    shopping = re.search(r"\b(prices?|buy|buying|purchase|orders?|suppliers?|discounts?|catalogue|marketplace)\b", text)
+    sourcing = re.search(r"\b(where|how)\b.*\b(get|find|source)\b.*\b(seeds?|fertilisers?|fertilizers?)\b", text)
+    recommendation = re.search(r"\brecommend(?:ations?|ed|ing|s)?\b", text)
+    product = re.search(r"\b(products?|suppliers?|seeds?|fertilisers?|fertilizers?)\b", text)
+    # Generic app recommendations mean buying opportunities. A request for advice
+    # about irrigation or crop rotation must still reach the farming guidance.
+    generic_recommendations = re.fullmatch(
+        r"(?:(?:what|are|is|do|you|have|show|list|find|give|me|my|the|some|any|available|current|please)\s+)*"
+        r"(?:recommendations?|opportunities)(?:\s+(?:for|my|me|farm|farmer|please))*", text)
+    if shopping or sourcing or (recommendation and product) or generic_recommendations:
         return "buying"
     if re.fullmatch(r"(crop(s)? )?seeds?", text):
         return "buying"

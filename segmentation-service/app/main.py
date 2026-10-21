@@ -3,7 +3,7 @@ import os
 import threading
 import time
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from uuid import UUID
@@ -12,8 +12,9 @@ import psycopg
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
 
-from app.engine import RULE_VERSION, demand_summary, experiment_arm, market_forecasts, matches, segment, services
+from app.engine import RULE_VERSION, demand_summary, experiment_arm, matches, segment, services
 from app.models import CROPS, PROVINCES, FarmProfile, Feedback, MarketRecord
+from app.outcomes import create_router
 from app.store import Store
 from app.training import active_segment
 
@@ -36,6 +37,7 @@ async def lifespan(app):
 
 
 app = FastAPI(title="AgriTech Market Intelligence", version="1.0.0", lifespan=lifespan)
+app.include_router(create_router(store))
 
 
 def identity(authorization: str = Header(default="")):
@@ -49,7 +51,7 @@ def identity(authorization: str = Header(default="")):
             owner = json.load(response)["farmerId"]
     except HTTPError as exc:
         raise HTTPException(exc.code if exc.code in (401, 403) else 503, "Identity verification unavailable") from exc
-    except (URLError, TimeoutError, KeyError) as exc:
+    except (URLError, TimeoutError, ConnectionError, KeyError, ValueError) as exc:
         raise HTTPException(503, "Identity verification unavailable") from exc
     with rate_lock:
         now = time.monotonic()
@@ -167,7 +169,15 @@ def feedback(body: Feedback, owner=Depends(identity)):
 
 @app.get("/api/demand")
 def demand(owner=Depends(identity)):
-    return {"rows": demand_summary(store.records(), store.searches(), store.prices()),
-            "forecasts": market_forecasts(store.prices()),
+    published = store.latest_snapshot() or {}
+    try:
+        generated = datetime.fromisoformat(published["generatedAt"].replace("Z", "+00:00"))
+        current = timedelta(0) <= datetime.now(timezone.utc) - generated <= timedelta(days=2)
+        current = current and generated.astimezone(timezone(timedelta(hours=2))).date().replace(day=1) == date.today().replace(day=1)
+    except (KeyError, ValueError, TypeError):
+        current = False
+    return {"rows": demand_summary(store.records(), store.searches(), store.prices(), order_outcomes=store.order_outcomes()),
+            "forecasts": published.get("forecasts", []) if current else [],
+            "forecastStatus": "published" if current else "pending_analytics",
             "pipeline": store.job("nightly_snapshot"),
-            "notice": "Requests and failed searches are demand signals, not completed sales. Historical prices do not prove profit."}
+            "notice": "Requests and failed searches are demand signals. Completed orders are recorded trusted marketplace events. Historical prices do not prove profit."}

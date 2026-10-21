@@ -20,7 +20,7 @@ export default function AI({ farmer, setPage, reviewOrder }) {
   const [starting, setStarting] = useState(true);
   const pending = useRef(false);
   const session = useRef(0);
-  const activeFarmer = useRef(farmer.id);
+  const chatSession = useRef(0);
   const load = async () => {
     const current = ++session.current;
     setLoading(true); setError(''); setOpportunityError(''); setInsights(null); setItems([]);
@@ -41,100 +41,129 @@ export default function AI({ farmer, setPage, reviewOrder }) {
     } catch (e) { if (current === session.current) setError(e.message); }
     finally { if (current === session.current) setLoading(false); }
   };
-  useEffect(() => {
-    activeFarmer.current = farmer.id;
-    setMessages([]); setQuestion(''); setInsights(null); setItems([]); setChatError('');
-    setConversationId(null); setApproval(null); setStarting(true);
+  const openConversation = async (current = chatSession.current) => {
+    setStarting(true); setChatError('');
     const key = `agritech_conversation_${farmer.id}`;
-    (async () => {
-      try {
-        let saved;
-        const existing = localStorage.getItem(key);
-        if (existing) {
-          try { saved = await assistantApi.conversation(existing); }
-          catch (e) { if (e.status !== 404) throw e; localStorage.removeItem(key); }
+    try {
+      let saved;
+      const existing = localStorage.getItem(key);
+      if (existing) {
+        try { saved = await assistantApi.conversation(existing); }
+        catch (e) {
+          if (current !== chatSession.current) return;
+          if (e.status !== 404) throw e;
+          localStorage.removeItem(key);
         }
-        if (!saved) saved = await assistantApi.createConversation();
-        if (activeFarmer.current !== farmer.id) return;
-        setConversationId(saved.conversationId); setMessages(saved.messages || []); setApproval(saved.approval);
-        localStorage.setItem(key, saved.conversationId);
-      } catch (e) { if (activeFarmer.current === farmer.id) setChatError(e.message); }
-      finally { if (activeFarmer.current === farmer.id) setStarting(false); }
-    })();
+      }
+      if (current !== chatSession.current) return;
+      if (!saved) saved = await assistantApi.createConversation();
+      if (current !== chatSession.current) return;
+      setConversationId(saved.conversationId); setMessages(saved.messages || []); setApproval(saved.approval);
+      localStorage.setItem(key, saved.conversationId);
+    } catch (e) { if (current === chatSession.current) setChatError(e.message); }
+    finally { if (current === chatSession.current) setStarting(false); }
+  };
+  useEffect(() => {
+    const current = ++chatSession.current;
+    pending.current = false; setSending(false); setRefreshing(false);
+    setMessages([]); setQuestion(''); setInsights(null); setItems([]); setChatError('');
+    setConversationId(null); setApproval(null);
+    openConversation(current);
     load();
-    return () => { session.current++; activeFarmer.current = null; };
+    return () => { session.current++; chatSession.current++; };
   }, [farmer.id]);
+  const restoreConversation = async current => {
+    try {
+      const saved = await assistantApi.conversation(conversationId);
+      if (current === chatSession.current) { setMessages(saved.messages || []); setApproval(saved.approval); }
+      return true;
+    } catch { return false; }
+  };
   const send = async (event) => {
     event.preventDefault();
     const prompt = question.trim();
     if (!prompt || pending.current || !conversationId || approval) return;
-    const id = farmer.id;
+    const current = chatSession.current;
     pending.current = true; setSending(true); setChatError('');
     setMessages(previous => [...previous, { role: 'user', text: prompt }]); setQuestion('');
     try {
       const reply = await assistantApi.turn(conversationId, prompt);
-      if (activeFarmer.current === id) setMessages(previous => [...previous, { role: 'assistant', text: reply.response, sources: reply.sources }]);
-    } catch (e) { if (activeFarmer.current === id) {
+      if (current === chatSession.current) {
+        setMessages(previous => [...previous, { role: 'assistant', text: reply.response, sources: reply.sources }]);
+        setApproval(reply.approval || null);
+      }
+    } catch (e) { if (current === chatSession.current) {
       setChatError(e.message); setQuestion(prompt);
       setMessages(previous => previous.at(-1)?.role === 'user' && previous.at(-1)?.text === prompt ? previous.slice(0, -1) : previous);
-      if (e.status === 409) {
-        try {
-          const saved = await assistantApi.conversation(conversationId);
-          if (activeFarmer.current === id) { setMessages(saved.messages || []); setApproval(saved.approval); }
-        } catch { /* Keep the original request error visible. */ }
-      }
+      if (e.status === 409) await restoreConversation(current);
     } }
-    finally { pending.current = false; setSending(false); }
+    finally { if (current === chatSession.current) { pending.current = false; setSending(false); } }
   };
   const clearConversation = async () => {
     if (pending.current) return;
     const id = farmer.id;
+    const current = chatSession.current;
     pending.current = true; setStarting(true); setChatError('');
     try {
       if (conversationId) {
         try { await assistantApi.deleteConversation(conversationId); }
         catch (e) { if (e.status !== 404) throw e; }
       }
-      if (activeFarmer.current !== id) return;
+      if (current !== chatSession.current) return;
       localStorage.removeItem(`agritech_conversation_${id}`);
       setConversationId(null); setMessages([]); setQuestion(''); setApproval(null);
       const saved = await assistantApi.createConversation();
-      if (activeFarmer.current !== id) return;
+      if (current !== chatSession.current) return;
       setConversationId(saved.conversationId); localStorage.setItem(`agritech_conversation_${id}`, saved.conversationId);
-    } catch (e) { if (activeFarmer.current === id) setChatError(e.message); }
-    finally { pending.current = false; if (activeFarmer.current === id) setStarting(false); }
+    } catch (e) { if (current === chatSession.current) setChatError(e.message); }
+    finally { if (current === chatSession.current) { pending.current = false; setStarting(false); } }
   };
   const requestReview = async action => {
     if (pending.current || !conversationId || approval) return;
-    const id = farmer.id;
+    const current = chatSession.current;
     pending.current = true; setSending(true); setChatError('');
     try {
       const reply = await assistantApi.turn(conversationId, 'Review my group-order buying opportunity', action);
-      if (activeFarmer.current === id) setApproval(reply.approval);
-    } catch (e) { if (activeFarmer.current === id) setChatError(e.message); }
-    finally { pending.current = false; if (activeFarmer.current === id) setSending(false); }
+      if (current === chatSession.current) setApproval(reply.approval);
+    } catch (e) { if (current === chatSession.current) {
+      setChatError(e.message);
+      if (e.status === 409) await restoreConversation(current);
+    } }
+    finally { if (current === chatSession.current) { pending.current = false; setSending(false); } }
   };
   const resolveApproval = async approved => {
     if (pending.current || !approval) return;
-    const id = farmer.id;
+    const current = chatSession.current;
     pending.current = true; setSending(true); setChatError('');
     try {
       const reply = await assistantApi.resume(conversationId, approval.interruptId, approved);
-      const saved = await assistantApi.conversation(conversationId);
-      if (activeFarmer.current !== id) return;
-      setMessages(saved.messages); setApproval(saved.approval);
-      if (reply.actionReady) reviewOrder(reply.actionReady.orderId, reply.actionReady.quantity);
-    } catch (e) { if (activeFarmer.current === id) setChatError(e.message); }
-    finally { pending.current = false; if (activeFarmer.current === id) setSending(false); }
+      if (current !== chatSession.current) return;
+      // Resume is already committed. A history refresh must not hide its result
+      // or leave the consumed approval blocking the next question.
+      setApproval(reply.approval || null);
+      setMessages(previous => [...previous, { role: 'assistant', text: reply.response, sources: reply.sources }]);
+      if (reply.actionReady) {
+        reviewOrder(reply.actionReady.orderId, reply.actionReady.quantity);
+        return;
+      }
+      const restored = await restoreConversation(current);
+      if (current !== chatSession.current) return;
+      if (!restored) setChatError('Your review was processed, but the conversation history could not be refreshed.');
+    } catch (e) { if (current === chatSession.current) {
+      setChatError(e.message);
+      if (e.status === 409) await restoreConversation(current);
+    } }
+    finally { if (current === chatSession.current) { pending.current = false; setSending(false); } }
   };
   const generate = async () => {
     const id = farmer.id;
+    const current = chatSession.current;
     setRefreshing(true); setOpportunityError('');
     try {
       const recommendations = await recommendationApi.generate(id);
-      if (activeFarmer.current === id) setItems(recommendations || []);
-    } catch (e) { if (activeFarmer.current === id) setOpportunityError(e.message); }
-    finally { setRefreshing(false); }
+      if (current === chatSession.current) setItems(recommendations || []);
+    } catch (e) { if (current === chatSession.current) setOpportunityError(e.message); }
+    finally { if (current === chatSession.current) setRefreshing(false); }
   };
   return <>
     <div className="page-head"><div><p className="eyebrow">YOUR FARM</p><h1>Farm advice and buying insights</h1></div></div>
@@ -167,6 +196,7 @@ export default function AI({ farmer, setPage, reviewOrder }) {
         </section>}
       </div>
       {chatError && <p className="farm-error" role="alert">{chatError}</p>}
+      {chatError && !conversationId && !starting && <button className="secondary" onClick={() => openConversation()}>Retry conversation</button>}
       <form className="farm-question" onSubmit={send}>
         <label className="farm-input"><span>Your question</span><input value={question} onChange={e => setQuestion(e.target.value)} maxLength={2000} disabled={sending || starting || !conversationId || !!approval} required /></label>
         <button className="primary" disabled={sending || starting || !conversationId || !!approval || !question.trim()}>{sending ? 'Waiting...' : 'Ask'}</button>

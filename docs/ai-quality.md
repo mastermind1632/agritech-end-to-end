@@ -5,8 +5,9 @@
 Recommendations are deterministic, not a newly trained model. They match the authenticated
 farmer's expense item names and their own past group-order product names against open orders.
 Generic words such as seed, bag and planting do not establish a crop match. Closed/full orders
-and orders already joined by the farmer are excluded. No records means no personalised
-suggestions. Suggestions are recomputed rather than duplicated in recommendation history.
+and orders already joined by the farmer are excluded. With no matching records, available
+orders are labelled as opportunities to explore rather than personalised purchase matches.
+Suggestions are recomputed rather than duplicated in recommendation history.
 Matching recorded purchases does not prove that a variety is suitable for the farm.
 
 The API calculates ZAR totals with BigDecimal, rounds to cents, and quotes a requested quantity

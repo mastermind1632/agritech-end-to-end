@@ -1,11 +1,14 @@
+import os
+import tempfile
 import unittest
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import patch
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
 from app import main
+from app.training import promote, train
 from test_engine import profile, record
 
 
@@ -84,3 +87,47 @@ class ApiTest(unittest.TestCase):
     def test_feedback_tracking_requires_consent(self):
         self.store.p["analyticsConsent"] = False
         self.assertEqual(self.client.post("/api/feedback", json={"impressionId": str(uuid4()), "recordId": str(uuid4()), "action": "click"}).status_code, 409)
+
+    def test_forecasts_are_served_from_published_analytics_without_request_time_fitting(self):
+        forecast = {"crop": "tomato", "forecast": [{"month": date.today().replace(day=1).isoformat(), "quantityKg": 100}]}
+        self.store.latest_snapshot = lambda: {"generatedAt": datetime.now(timezone.utc).isoformat(), "forecasts": [forecast]}
+        self.store.searches = self.store.prices = self.store.order_outcomes = lambda: []
+        self.store.job = lambda name: None
+        with patch("app.forecasting._holt_winters", side_effect=AssertionError("Do not fit models in HTTP requests")):
+            response = self.client.get("/api/demand")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["forecasts"], [forecast])
+        self.assertEqual(response.json()["forecastStatus"], "published")
+        self.store.latest_snapshot = lambda: {"generatedAt": (datetime.now(timezone.utc) - timedelta(days=3)).isoformat(), "forecasts": [forecast]}
+        self.assertEqual(self.client.get("/api/demand").json()["forecasts"], [])
+        self.store.latest_snapshot = lambda: None
+        self.assertEqual(self.client.get("/api/demand").json()["forecastStatus"], "pending_analytics")
+
+    def test_identity_connection_reset_returns_an_actionable_service_status(self):
+        main.app.dependency_overrides.clear()
+        with patch("app.main.urlopen", side_effect=ConnectionResetError("closed")):
+            response = self.client.get("/api/profile", headers={"Authorization": "Bearer synthetic"})
+        self.assertEqual(response.status_code, 503)
+
+    def test_recommendations_use_reviewed_kmeans_then_fall_back_when_cohort_changes(self):
+        profiles = [profile("farmer-a" if i == 0 else str(i),
+                            crop=("tomato", "maize", "citrus")[i % 3],
+                            hectares=(2, 30, 150)[i % 3],
+                            capacityKg=(1000, 20000, 100000)[i % 3],
+                            harvestMonth=date.today().month) for i in range(45)]
+        self.store.p = profiles[0]
+        self.store.profiles = lambda: profiles
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {"MODEL_DIR": directory}):
+            self.assertEqual(self.client.get("/api/recommendations").json()["segment"]["method"], "rules")
+            train(profiles, track=False)
+            promote("Test reviewer", profiles)
+            response = self.client.get("/api/recommendations")
+            self.assertEqual(response.status_code, 200)
+            payload = response.json()
+            self.assertEqual(payload["segment"]["method"], "kmeans")
+            self.assertEqual([r["id"] for r in payload["recommendations"]], [self.store.r["id"]])
+            self.assertNotIn("ownerId", payload["recommendations"][0])
+            profiles.append(profile("new-farmer", harvestMonth=date.today().month))
+            self.assertEqual(self.client.get("/api/recommendations").json()["segment"]["method"], "kmeans")
+            profiles[1] = {**profiles[1], "hectares": profiles[1]["hectares"] + 1}
+            self.assertEqual(self.client.get("/api/recommendations").json()["segment"]["method"], "rules")

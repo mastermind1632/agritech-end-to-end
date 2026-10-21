@@ -62,6 +62,15 @@ class MarketIntelligenceControllerTest {
     }
 
     @Test
+    void preservesCreationStatusWithoutChangingFeedbackSuccess() {
+        status = 201;
+        assertEquals(201, controller.create("records", Map.of("crop", "tomato"), "Bearer test-token").getStatusCode().value());
+        assertEquals("/api/records", path.get());
+        status = 200;
+        assertEquals(200, controller.create("feedback", Map.of("action", "click"), "Bearer test-token").getStatusCode().value());
+    }
+
+    @Test
     void preservesValidationAndOwnershipStatusesWithoutForwardingInternalDetails() {
         status = 422;
         var error = assertThrows(ResponseStatusException.class, () -> controller.profile(Map.of(), "Bearer test-token"));
