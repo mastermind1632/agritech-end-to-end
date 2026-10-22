@@ -71,7 +71,7 @@ public class FarmerService {
         farmer.setContact(contact);
         farmer.setEmail(email);
         farmer.setRole(role);
-        farmer.setPreferredLanguage(LANGUAGES.contains(r.getLanguage()) ? r.getLanguage() : "en");
+        farmer.setPreferredLanguage(r.getLanguage() != null && LANGUAGES.contains(r.getLanguage()) ? r.getLanguage() : "en");
         farmer.setPasswordHash(passwordEncoder.encode(r.getPassword()));
         Farmer saved = farmerRepository.save(farmer);
         privacy.record(saved.getId(), "TERMS", true);
