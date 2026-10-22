@@ -21,6 +21,9 @@ rollback() {
     if [ "$result" -eq 0 ]; then return; fi
     trap - EXIT
     set +e
+    echo '===== Release failed. Container status and the last backend log lines follow.'
+    compose ps -a
+    compose logs --no-color --tail 150 spring-app
     echo 'Release failed; restoring the previous application configuration. Database volumes are unchanged.'
     compose stop segmentation-service segmentation-worker
     for file in .env docker-compose.prod.yml docker-compose.ai.yml docker-compose.segmentation.yml docker-compose.https.yml; do
@@ -43,7 +46,7 @@ if [ "$available" -lt 4194304 ]; then
     echo 'Less than 4 GiB is free. Refusing to pull images into a nearly full disk.'
     exit 1
 fi
-compose pull
+compose pull --quiet
 compose up -d --no-build --wait --wait-timeout 900
 
 compose exec -T segmentation-service python - <<'PY'
