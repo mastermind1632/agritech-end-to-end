@@ -39,6 +39,19 @@ public class RecommendationService {
     public List<Opportunity> forFarmer(String farmerId) { return generate(farmerId); }
 
     public List<Opportunity> generate(String farmerId) {
+        List<String> history = purchaseHistory(farmerId);
+        List<Opportunity> result = new ArrayList<>();
+        for (GroupOrder order : orders.findAllByStatusOrderByCreatedAtDesc("open")) {
+            if (!available(order, farmerId)) continue;
+            SupplierProduct product = products.findById(order.getProductId()).orElse(null);
+            if (product == null || product.getProductName() == null || !validPrice(product, order)) continue;
+            result.add(opportunity(order, product, history, 1));
+        }
+        return result.stream().sorted(Comparator.comparingInt((Opportunity o) -> o.matchedItems().size())
+                .reversed().thenComparing(Opportunity::id)).limit(10).toList();
+    }
+
+    private List<String> purchaseHistory(String farmerId) {
         if (!farmers.existsById(farmerId))
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Farmer not found");
         List<String> history = new ArrayList<>(expenses.findAllByFarmerIdOrderByDateDesc(farmerId)
@@ -48,33 +61,35 @@ public class RecommendationService {
             orders.findById(item.getGroupOrderId()).flatMap(o -> products.findById(o.getProductId()))
                     .map(SupplierProduct::getProductName).ifPresent(history::add);
         }
-        List<Opportunity> result = new ArrayList<>();
-        for (GroupOrder order : orders.findAllByStatusOrderByCreatedAtDesc("open")) {
-            if (remaining(order) < 1 || items.existsByGroupOrderIdAndFarmerId(order.getId(), farmerId)) continue;
-            SupplierProduct product = products.findById(order.getProductId()).orElse(null);
-            if (product == null || product.getProductName() == null || !validPrice(product, order)) continue;
-            List<String> matched = history.stream().filter(h -> matches(h, product.getProductName()))
-                    .distinct().limit(5).toList();
-            result.add(new Opportunity(order.getId(), product.getId(), order.getId(), product.getProductName(),
-                    (matched.isEmpty() ? "Open group order to explore; no purchase match was found in your records"
-                            : "Matches your recorded purchases: " + String.join(", ", matched))
-                    + ". Check the variety, pack size and supplier terms before joining.",
-                    matched, remaining(order), compare(product, order, 1), equivalents(product)));
-        }
-        return result.stream().sorted(Comparator.comparingInt((Opportunity o) -> o.matchedItems().size())
-                .reversed().thenComparing(Opportunity::id)).limit(10).toList();
+        return history;
     }
 
     public Opportunity quote(String farmerId, String orderId, int quantity) {
-        Opportunity own = generate(farmerId).stream().filter(o -> o.id().equals(orderId)).findFirst()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Buying opportunity unavailable"));
+        List<String> history = purchaseHistory(farmerId);
         GroupOrder order = orders.findById(orderId).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.CONFLICT, "Order is no longer available"));
-        SupplierProduct product = products.findById(own.recommendedProductId()).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "Buying opportunity unavailable"));
+        if (!available(order, farmerId))
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Buying opportunity unavailable");
+        SupplierProduct product = products.findById(order.getProductId()).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.CONFLICT, "Product is no longer available"));
-        return new Opportunity(own.id(), own.recommendedProductId(), own.suggestedGroupOrderId(),
-                own.productName(), own.reason(), own.matchedItems(), remaining(order), compare(product, order, quantity),
-                equivalents(product));
+        if (product.getProductName() == null || !validPrice(product, order))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Listed prices are unavailable");
+        return opportunity(order, product, history, quantity);
+    }
+
+    private boolean available(GroupOrder order, String farmerId) {
+        return "open".equals(order.getStatus()) && remaining(order) > 0
+                && !items.existsByGroupOrderIdAndFarmerId(order.getId(), farmerId);
+    }
+
+    private Opportunity opportunity(GroupOrder order, SupplierProduct product, List<String> history, int quantity) {
+        List<String> matched = history.stream().filter(h -> matches(h, product.getProductName()))
+                .distinct().limit(5).toList();
+        return new Opportunity(order.getId(), product.getId(), order.getId(), product.getProductName(),
+                (matched.isEmpty() ? "Open group order to explore; no purchase match was found in your records"
+                        : "Matches your recorded purchases: " + String.join(", ", matched))
+                + ". Check the variety, pack size and supplier terms before joining.",
+                matched, remaining(order), compare(product, order, quantity), equivalents(product));
     }
 
     private List<EquivalentPrice> equivalents(SupplierProduct selected) {

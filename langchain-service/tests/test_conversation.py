@@ -17,6 +17,14 @@ class ConversationTests(unittest.TestCase):
         for question in ('Where can i get seeds', 'Where can i get seeda', 'Crops seeds', 'seeds', 'Buy maize seeds'):
             self.assertEqual(route_for(question), 'buying', question)
 
+    def test_recommendation_subject_distinguishes_farming_advice_from_shopping(self):
+        for question in ('Recommend crop rotation', 'Recommendations for irrigation',
+                         'What soil improvements do you recommend?', 'Recommend a planting schedule'):
+            self.assertEqual(route_for(question), 'farming', question)
+        for question in ('My recommendations', 'Show me buying opportunities', 'Any recommendations?',
+                         'Recommend maize seeds', 'What fertiliser do you recommend?', 'Compare seed prices'):
+            self.assertEqual(route_for(question), 'buying', question)
+
     def test_new_short_topic_does_not_inherit_seed_search(self):
         self.assertFalse(followup('How do i water plants'))
         self.assertEqual(route_for('How do i water plants', 'buying'), 'farming')

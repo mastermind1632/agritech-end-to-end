@@ -2,7 +2,7 @@
 // same in Docker. (The old default of http://localhost:8080/api caused CORS failures in Docker.)
 import { tr } from './i18n.js';
 
-export const API = import.meta.env.VITE_API_URL || '/api';
+export const API = import.meta.env?.VITE_API_URL || '/api';
 
 export const TOKEN_KEY = 'agritech_token';
 export const REFRESH_KEY = 'agritech_refresh';
@@ -65,20 +65,35 @@ function sessionEnded() {
 export async function api(path, options = {}, retried = false) {
   const token = localStorage.getItem(TOKEN_KEY);
   const isForm = typeof FormData !== 'undefined' && options.body instanceof FormData;
-  let res;
+  const { timeoutMs = path.startsWith('/ai/conversations') || path === '/ai/chat' ? 240000 : 30000,
+    signal, ...requestOptions } = options;
+  const controller = new AbortController();
+  const cancel = () => controller.abort(signal.reason);
+  if (signal?.aborted) cancel();
+  else signal?.addEventListener('abort', cancel, { once: true });
+  let timedOut = false;
+  const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
+  let res, text;
   try {
     res = await fetch(`${API}${path}`, {
-      ...options,
+      ...requestOptions,
+      signal: controller.signal,
       headers: {
         ...(isForm ? {} : { 'Content-Type': 'application/json' }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(options.headers || {})
       }
     });
+    text = await res.text();
   } catch {
+    if (timedOut) throw new Error(tr('The server took too long to respond. Please try again.'));
+    if (signal?.aborted) throw new Error(tr('The request was cancelled.'));
     throw new Error(tr(navigator.onLine === false
       ? 'You are offline. This will work again when you have signal.'
       : 'We could not connect. Please check your internet connection and try again.'));
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener('abort', cancel);
   }
 
   if (res.status === 401 && token && !isAuthPath(path)) {
@@ -86,7 +101,6 @@ export async function api(path, options = {}, retried = false) {
     throw sessionEnded();
   }
 
-  const text = await res.text();
   let data = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
 
@@ -111,8 +125,8 @@ const qs = (params = {}) => {
 };
 
 /** Multipart upload with the login token (and one silent refresh on expiry). */
-export async function upload(path, formData) {
-  return api(path, { method: 'POST', body: formData });
+export async function upload(path, formData, options = {}) {
+  return api(path, { ...options, method: 'POST', body: formData });
 }
 
 /** Downloads a protected file (Excel, CSV, JSON, document) and hands it to the browser. */
@@ -334,7 +348,7 @@ export const statementApi = {
     fd.append('file', file);
     fd.append('consent', String(Boolean(consent)));
     fd.append('keepOriginal', String(Boolean(keepOriginal)));
-    return upload('/statements', fd);
+    return upload('/statements', fd, { timeoutMs: 240000 });
   },
   updateTxn: (id, body) => put(`/statements/transactions/${id}`, body),
   confirm: (id) => post(`/statements/${id}/confirm`),

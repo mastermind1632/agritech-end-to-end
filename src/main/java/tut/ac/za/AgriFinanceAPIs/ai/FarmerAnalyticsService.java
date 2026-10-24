@@ -37,6 +37,8 @@ public class FarmerAnalyticsService {
         int k = Math.max(1, Math.min(requestedK, farmers.size()));
         FeatureSpace featureSpace = FeatureSpace.from(farmers);
         List<double[]> centroids = initialCentroids(featureSpace.normalized, k);
+        // Identical profiles cannot form separate meaningful clusters.
+        k = centroids.size();
         int[] assignments = new int[farmers.size()];
 
         for (int iteration = 0; iteration < 25; iteration++) {
@@ -55,10 +57,13 @@ public class FarmerAnalyticsService {
                     members.add(new ClusteredFarmer(snapshot(farmers.get(i)), round(distance(featureSpace.normalized.get(i), centroids.get(clusterId)))));
                 }
             }
+            if (members.isEmpty()) {
+                continue;
+            }
             members.sort(Comparator.comparing(ClusteredFarmer::distanceToCentroid));
             clusters.add(new FarmerCluster(clusterId, centroidSnapshot(clusterId, centroids.get(clusterId), featureSpace), members));
         }
-        return new ClusterResponse(requestedK, k, clusters);
+        return new ClusterResponse(requestedK, clusters.size(), clusters);
     }
 
     public FarmerMatchResponse nearestFarmers(String farmerId, int limit) {
@@ -185,13 +190,23 @@ public class FarmerAnalyticsService {
 
     private static List<double[]> initialCentroids(List<double[]> features, int k) {
         List<double[]> centroids = new ArrayList<>();
-        if (k == 1) {
-            centroids.add(features.get(0).clone());
-            return centroids;
-        }
-        for (int i = 0; i < k; i++) {
-            int index = (int) Math.round(i * (features.size() - 1) / (double) (k - 1));
-            centroids.add(features.get(index).clone());
+        centroids.add(features.getFirst().clone());
+        // Choose far-apart, distinct profiles instead of depending on row positions.
+        while (centroids.size() < k) {
+            double[] farthest = null;
+            double farthestDistance = 0;
+            for (double[] feature : features) {
+                double nearestDistance = centroids.stream().mapToDouble(centroid -> distance(feature, centroid))
+                        .min().orElse(0);
+                if (nearestDistance > farthestDistance) {
+                    farthest = feature;
+                    farthestDistance = nearestDistance;
+                }
+            }
+            if (farthest == null) {
+                break;
+            }
+            centroids.add(farthest.clone());
         }
         return centroids;
     }
