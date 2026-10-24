@@ -17,6 +17,16 @@
 .mi-workspace h2, .production-section h2 { font-size: 20px; margin: 20px 0 12px; }
 .mi-segment { border-left: 3px solid #247943; padding-left: 16px; margin-bottom: 28px; }
 .mi-segment h2 { overflow-wrap: anywhere; }
+.mi-advice { border: 1px solid #c7d3cb; border-radius: 8px; padding: 24px; background: #fff; margin-bottom: 28px; }
+.mi-advice-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+.mi-advice-head h2 { margin: 8px 0; }
+.mi-advice-head .eyebrow { margin: 0; }
+.mi-advice button { white-space: normal; }
+.mi-advice-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
+.mi-advice details { font-size: 13px; color: #526057; }
+.mi-advice summary { cursor: pointer; }
+.mi-group-details { color: #526057; font-size: 13px; line-height: 1.6; }
+.mi-group-details summary { cursor: pointer; }
 .mi-listing { display: flex; justify-content: space-between; gap: 16px; padding: 20px 0; border-bottom: 1px solid #dce5de; }
 .mi-listing > div { min-width: 0; }
 .mi-listing h3 { font-size: 18px; margin: 10px 0; text-transform: capitalize; }

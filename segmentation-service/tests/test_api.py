@@ -24,6 +24,9 @@ class FakeStore:
     def profiles(self):
         return []
 
+    def job(self, name):
+        return None
+
     def save_profile(self, owner, body):
         self.p = {**body, "ownerId": owner}
         return self.p
@@ -88,6 +91,29 @@ class ApiTest(unittest.TestCase):
         self.store.p["analyticsConsent"] = False
         self.assertEqual(self.client.post("/api/feedback", json={"impressionId": str(uuid4()), "recordId": str(uuid4()), "action": "click"}).status_code, 409)
 
+    def test_recommendations_explain_small_cohort_and_include_only_own_allowed_context(self):
+        self.store.profiles = lambda: [self.store.p, profile("second-farmer")]
+        self.store.job = lambda name: {"completedAt": "2026-10-25T10:00:00Z", "data": {
+            "status": "cold_start", "profiles": 2, "fingerprint": "private-fingerprint"}} if name == "monthly_training" else None
+        payload = self.client.get("/api/recommendations").json()
+        self.assertEqual(payload["segment"]["method"], "rules")
+        status = payload["segmentationStatus"]
+        self.assertEqual(status["code"], "insufficient_profiles")
+        self.assertEqual(status["consentedProfiles"], 2)
+        self.assertEqual(status["minimumProfiles"], 30)
+        self.assertEqual(status["trainingStatus"], "cold_start")
+        self.assertEqual(status["workerStatus"], "unknown")
+        self.assertNotIn("private-fingerprint", str(status))
+        self.assertEqual(set(payload["productionContext"]), {"crop", "province", "district", "hectares", "capacityKg",
+            "plantingMonth", "harvestMonth", "deliveryRadiusKm", "businessRegistered", "consistentProduction"})
+        self.assertEqual(payload["productionContext"]["crop"], self.store.p["crop"])
+
+    def test_recommendations_distinguish_opted_out_profile_from_model_failure(self):
+        self.store.p["analyticsConsent"] = False
+        payload = self.client.get("/api/recommendations").json()
+        self.assertEqual(payload["segmentationStatus"]["code"], "analytics_consent_required")
+        self.assertEqual(payload["segment"]["method"], "rules")
+
     def test_forecasts_are_served_from_published_analytics_without_request_time_fitting(self):
         forecast = {"crop": "tomato", "forecast": [{"month": date.today().replace(day=1).isoformat(), "quantityKg": 100}]}
         self.store.latest_snapshot = lambda: {"generatedAt": datetime.now(timezone.utc).isoformat(), "forecasts": [forecast]}
@@ -125,6 +151,7 @@ class ApiTest(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             payload = response.json()
             self.assertEqual(payload["segment"]["method"], "kmeans")
+            self.assertEqual(payload["segmentationStatus"]["code"], "active")
             self.assertEqual([r["id"] for r in payload["recommendations"]], [self.store.r["id"]])
             self.assertNotIn("ownerId", payload["recommendations"][0])
             profiles.append(profile("new-farmer", harvestMonth=date.today().month))

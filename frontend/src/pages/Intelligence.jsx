@@ -3,12 +3,14 @@ import { intelligenceApi } from '../lib/api';
 import useLang from '../hooks/useLang';
 import { tr } from '../lib/i18n';
 import { dateTime } from '../lib/format';
+import MarketAdvice from '../components/MarketAdvice';
 import '../market-intelligence.css';
 
 const money = n => n == null ? tr('Not stated') : new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(n);
 const today = () => new Date().toLocaleDateString('en-CA');
 const INITIAL = { kind: 'offer', crop: '', province: '', district: '', latitude: '', longitude: '', quantityKg: '', pricePerKg: '', availableFrom: today(), availableUntil: today(), displayName: '', publicContact: '' };
 const SERVICE_LABEL = { business_companion: 'Business registration support', export_readiness: 'Export readiness', expense_insights: 'Expense insights' };
+const SEGMENT_METHOD = { kmeans: 'K-means', kprototypes: 'K-prototypes', hdbscan: 'HDBSCAN' };
 
 function ForecastQuality({ forecast }) {
   const { t } = useLang();
@@ -20,7 +22,7 @@ function ForecastQuality({ forecast }) {
   </>;
 }
 
-export default function Intelligence({ setPage }) {
+export default function Intelligence({ farmer, setPage }) {
   const { t } = useLang();
   const [tab, setTab] = useState('matches');
   const [options, setOptions] = useState(null);
@@ -137,7 +139,14 @@ export default function Intelligence({ setPage }) {
       {needsProfile && <button className="primary" onClick={() => setPage('profile')}>{t('Complete production profile')}</button>}
       {loading && <p aria-live="polite">{t('Loading market data...')}</p>}
       {tab === 'matches' && recommendations && !loading && !error && <>
-        <div className="mi-segment"><span className="tag">{recommendations.segment.method === 'rules' ? t('RULE-BASED SEGMENT') : t('ML SEGMENT')}</span><h2>{t(recommendations.segment.name)}</h2><p className="muted">{t(recommendations.segment.reviewStatus)}</p></div>
+        <MarketAdvice key={farmer.id} farmerId={farmer.id} />
+        <div className="mi-segment"><span className="tag">{recommendations.segment.method === 'rules' ? t('Farm profile group') : t('{method} farm group', { method: SEGMENT_METHOD[recommendations.segment.method] || recommendations.segment.method })}</span><h2>{t(recommendations.segment.name)}</h2><p className="muted">{t(recommendations.segment.reviewStatus)}</p>
+          {recommendations.segmentationStatus && <details className="mi-group-details"><summary>{t('About your farm group')}</summary>
+            <p>{t('K-means learns groups from consenting farms. AI advice can use your own farm profile while those groups are being prepared.')}</p>
+            <p>{t('Profiles ready for training: {count} / {minimum}', { count: recommendations.segmentationStatus.consentedProfiles, minimum: recommendations.segmentationStatus.minimumProfiles })}</p>
+            <p>{t(recommendations.segmentationStatus.nextAction)}</p>
+          </details>}
+        </div>
         <h2>{t('Buyer matches')}</h2>{recommendations.recommendations.length ? recommendations.recommendations.map(r => record(r)) : <p className="mi-empty">{t('No buyer requests match your crop, harvest month, delivery radius and capacity yet.')}</p>}
         <p className="muted">{t(recommendations.notice)}</p>
         {recommendations.services.length > 0 && <><h2>{t('Service opportunities')}</h2><ul className="mi-services">{recommendations.services.map(s => <li key={s.service}><strong>{SERVICE_LABEL[s.service] ? t(SERVICE_LABEL[s.service]) : s.service.replaceAll('_', ' ')}</strong><p>{t(s.reason)}</p></li>)}</ul></>}

@@ -72,10 +72,11 @@ PY
 compose exec -T segmentation-service python /app/app/production_smoke.py
 compose exec -T langchain-service python - <<'PY'
 import json
+import os
 from urllib.request import Request, urlopen
 with urlopen('http://spring-app:8080/actuator/health', timeout=30) as response:
     assert json.load(response)['status'] == 'UP'
-body = {'model': 'qwen2.5:0.5b', 'system': 'Give a short farming answer using the supplied fact.',
+body = {'model': os.getenv('AI_MODEL', 'qwen2.5:1.5b'), 'system': 'Give a short farming answer using the supplied fact.',
         'prompt': 'Crop seed buyers should check germination. What should they check?',
         'options': {'num_predict': 60, 'temperature': 0}}
 request = Request('http://127.0.0.1:8001/api/generate', data=json.dumps(body).encode(),

@@ -1,5 +1,6 @@
 """Plain-English replies for authenticated ledger and recommendation results."""
 from decimal import Decimal
+from calendar import month_name
 import re
 
 
@@ -22,6 +23,11 @@ def produce_reply(result):
                 'Matching uses your crop, harvest month, delivery radius and seasonal capacity.')
     rows = result['recommendations']
     lines = ['Your farm group: ' + result['segment']['name'] + '.']
+    profile = result.get('productionContext')
+    if profile:
+        lines.append(f"Your recorded profile: {profile['crop']}, {profile['hectares']:g} ha, "
+                     f"{profile['capacityKg']:g} kg seasonal capacity, harvest in {month_name[profile['harvestMonth']]}, "
+                     f"delivery radius {profile['deliveryRadiusKm']:g} km.")
     if rows:
         lines.append('These recorded buyer requests match your production profile:')
         for row in rows[:3]:

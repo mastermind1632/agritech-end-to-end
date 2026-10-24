@@ -27,6 +27,7 @@ from app.telemetry import Telemetry
 from app.conversation import catalogue_reply, followup, route_for, seed_shopping
 from app.answer_quality import clean_answer, relevant_sources
 from app.verified_advice import buying_reply, ledger_reply, produce_reply
+from app.advisory import ADVICE_SYSTEM, advisory_prompt, buying_context, checked_advice, fallback_advice, produce_context
 
 MAX_HISTORY = 12
 MAX_HISTORY_CHARS = 12000
@@ -54,6 +55,8 @@ class FarmState(TypedDict, total=False):
     options: dict
     catalogue_answer: bool
     verified_reply: str | None
+    recommendation_context: dict | None
+    advice: dict | None
 
 
 class TurnContext:
@@ -130,7 +133,7 @@ class Backend:
 
 
 class Workflow:
-    def __init__(self, database, model_factory, backend=None, telemetry=None):
+    def __init__(self, database, model_factory, backend=None, telemetry=None, model_name='Qwen'):
         path = Path(database)
         path.parent.mkdir(parents=True, exist_ok=True)
         self.connection = sqlite3.connect(str(path), check_same_thread=False, timeout=30)
@@ -151,6 +154,7 @@ class Workflow:
         self.rates = defaultdict(deque)
         self.model_slots = BoundedSemaphore(2)
         self.model_factory = model_factory
+        self.model_name = model_name
         self.backend = backend
         self.telemetry = telemetry or Telemetry()
         self.checkpoint_connection = sqlite3.connect(str(path), check_same_thread=False, timeout=30)
@@ -245,7 +249,7 @@ class Workflow:
                     question = message['text']
                     messages.append(message)
                 else:
-                    messages.append({**message, 'text': clean_answer(message['text']),
+                    messages.append({**message, 'text': message['text'] if message.get('advice') else clean_answer(message['text']),
                                      'sources': relevant_sources(question, route_for(question), message.get('sources', []))})
             return {"conversationId": thread, "messages": messages,
                 "approval": dict(approval.value, interruptId=approval.id) if approval else None}
@@ -272,7 +276,8 @@ class Workflow:
             with tracing_context(enabled=False), self.telemetry.conversation(thread), self.telemetry.span("agritech_workflow"):
                 state = self.graph.invoke({"question": question, "proposal": proposal, "approval": None,
                     "action_ready": None, "answer": "", "sources": [], "policy_reply": None,
-                    "status": "running", "legacy": False, "options": {}, "catalogue_answer": False, 'verified_reply': None},
+                    "status": "running", "legacy": False, "options": {}, "catalogue_answer": False, 'verified_reply': None,
+                    'recommendation_context': None, 'advice': None},
                     self.config(thread), context=TurnContext(bearer))
             return self.response(thread, state)
 
@@ -298,10 +303,11 @@ class Workflow:
             self.connection.commit()
             owner = self.connection.execute("SELECT owner FROM farm_threads WHERE id=?", (thread,)).fetchone()[0]
         pending = self.get(owner, thread)["approval"]
-        return {"conversationId": thread, "model": "AgriTech" if pending or state.get("proposal") or state.get("catalogue_answer") or state.get("route") == "policy" else "Qwen",
+        generated_advice = (state.get('advice') or {}).get('status') == 'generated'
+        return {"conversationId": thread, "model": self.model_name if generated_advice else "AgriTech" if pending or state.get("proposal") or state.get("catalogue_answer") or state.get("route") == "policy" else self.model_name,
             "response": state.get("answer") or "Please review this group-order proposal before continuing.",
             "sources": [{k: v for k, v in s.items() if k != "content"} for s in state.get("sources", [])],
-            "approval": pending, "actionReady": state.get("action_ready"), "route": state.get("route")}
+            "approval": pending, "actionReady": state.get("action_ready"), "route": state.get("route"), 'advice': state.get('advice')}
 
     def legacy(self, body):
         with tracing_context(enabled=False), self.telemetry.span("stateless_generation"):
@@ -338,22 +344,28 @@ class Workflow:
         result = self.backend.retrieve(question, runtime.context.bearer, state["question"])
         sources = relevant_sources(question, state['route'], result['sources'])
         verified_reply = None
+        recommendation_context = None
         if not result.get('policyReply') and not state.get('proposal'):
             if state['route'] == 'finance':
                 verified_reply = ledger_reply(state['question'], result.get('ledger'))
             elif state['route'] == 'produce':
                 market = self.backend.produce_matches(runtime.context.bearer)
                 verified_reply = produce_reply(market)
+                recommendation_context = produce_context(market)
                 sources += [{'id': 'buyer:' + row['id'], 'title': 'Buyer request: ' + row['displayName'],
-                             'content': json.dumps(row)} for row in market.get('recommendations', [])[:3]]
+                             'content': json.dumps({key: value for key, value in row.items()
+                                 if key in ('crop', 'quantityKg', 'province', 'district', 'distanceKm', 'availableFrom', 'availableUntil', 'reasons')})}
+                            for row in market.get('recommendations', [])[:3]]
             elif (state['route'] == 'buying' and not seed_shopping(state['question'], state.get('messages', []))
                   and re.search(r'recommend|opportunities|group.buying', state['question'], re.I)):
                 opportunities = self.backend.buying_opportunities(runtime.context.bearer)
                 verified_reply = buying_reply(opportunities)
+                recommendation_context = buying_context(opportunities)
                 sources += [{'id': 'order:' + row['id'], 'title': 'Group order: ' + row['productName'],
                              'content': json.dumps(row)} for row in opportunities[:3]]
         return {"sources": sources, "context": result["context"],
-            "system": result["system"], "policy_reply": result.get("policyReply"), 'verified_reply': verified_reply}
+            "system": result["system"], "policy_reply": result.get("policyReply"), 'verified_reply': verified_reply,
+            'recommendation_context': recommendation_context}
 
     def policy(self, state, runtime):
         return {"answer": state.get("policy_reply") or "I can help with farming and AgriTech. "
@@ -362,11 +374,13 @@ class Workflow:
 
     def answer(self, state, runtime):
         if state.get('verified_reply'):
+            if state.get('recommendation_context') is not None:
+                return self.recommendation_answer(state, state['verified_reply'], state['recommendation_context'])
             return {'answer': state['verified_reply'], 'catalogue_answer': True}
         if not state.get("legacy") and state["route"] == "buying":
             reply = catalogue_reply(state["question"], state["sources"], state.get("messages", []))
             if reply:
-                return {"answer": reply, "catalogue_answer": True}
+                return self.recommendation_answer(state, reply, {'kind': 'buying', 'catalogue': True})
         if not self.model_slots.acquire(blocking=False):
             raise HTTPException(status_code=503, detail="The farming model is busy. Please retry shortly.")
         try:
@@ -390,8 +404,38 @@ class Workflow:
         finally:
             self.model_slots.release()
 
+    def recommendation_answer(self, state, facts, context):
+        advice = None
+        reason = 'model_busy'
+        invoked = False
+        if self.model_slots.acquire(blocking=False):
+            try:
+                model = self.model_factory({'temperature': 0.1, 'num_predict': 180, 'num_ctx': 4096}, state['route'])
+                agent = create_agent(model=model, tools=[], system_prompt=ADVICE_SYSTEM)
+                with self.telemetry.span('qwen_recommendation_advice', 'llm'):
+                    invoked = True
+                    result = agent.invoke({'messages': [{'role': 'user', 'content': advisory_prompt(
+                        state['question'], facts, context, state.get('sources', []))}]}, config={'recursion_limit': 4})
+                generated = StrOutputParser().invoke(result['messages'][-1]).strip()
+                advice = checked_advice(generated, state['route'], context, facts)
+                reason = None if advice else 'quality_check'
+            except Exception:
+                reason = 'model_unavailable'
+            finally:
+                self.model_slots.release()
+        status = 'generated' if advice else 'fallback'
+        if advice is None:
+            advice = fallback_advice(state['route'], context)
+        label = 'AI advice:' if status == 'generated' else 'AI advice is temporarily unavailable. Suggested next step:'
+        return {'answer': facts + '\n\n' + label + '\n' + advice, 'catalogue_answer': True,
+                'advice': {'status': status, 'text': advice, 'reason': reason, 'modelInvoked': invoked,
+                           **({'clarification': facts} if facts.rstrip().endswith('?') else {})}}
+
     def validate(self, state, runtime):
         answer = state["answer"]
+        if state.get('advice'):
+            # Facts are rendered by the application; supplementary prose was checked before composition.
+            return {}
         if not answer:
             raise HTTPException(status_code=502, detail="Ollama returned an empty response")
         if re.search(r"kubectl|terraform\s*\{|cloud seed command|i (placed|purchased|paid)|definitely in stock", answer, re.I):
@@ -440,4 +484,7 @@ class Workflow:
     def remember(self, state, runtime):
         citations = [{k:v for k,v in s.items() if k != "content"} for s in state.get("sources", [])]
         return {"messages": [{"role": "user", "text": state["question"]},
-            {"role": "assistant", "text": state["answer"], "sources": citations}], "status": "complete"}
+            {"role": "assistant", "text": state["answer"], "sources": citations,
+             'model': (self.model_name if state['advice']['status'] == 'generated' else 'AgriTech') if state.get('advice')
+                      else 'AgriTech' if state.get('catalogue_answer') or state.get('proposal') or state.get('route') == 'policy' else self.model_name,
+             **({'advice': state['advice']} if state.get('advice') else {})}], "status": "complete"}

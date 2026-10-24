@@ -7,8 +7,9 @@
 import ui from './ui.js';
 import content from './content.js';
 import server from './server.js';
+import aiAdvice from './aiAdvice.js';
 
 export const LANG_COLUMNS = { af: 0, nso: 1, ts: 2, zu: 3 };
 
-const PHRASES = Object.assign(Object.create(null), server, content, ui);
+const PHRASES = Object.assign(Object.create(null), server, content, ui, aiAdvice);
 export default PHRASES;

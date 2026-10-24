@@ -81,9 +81,9 @@ export default function AI({ farmer, setPage, reviewOrder }) {
       return true;
     } catch { return false; }
   };
-  const send = async (event) => {
+  const send = async (event, suggestedPrompt) => {
     event.preventDefault();
-    const prompt = question.trim();
+    const prompt = (suggestedPrompt ?? question).trim();
     if (!prompt || pending.current || !conversationId || approval) return;
     const current = chatSession.current;
     pending.current = true; setSending(true); setChatError('');
@@ -91,7 +91,7 @@ export default function AI({ farmer, setPage, reviewOrder }) {
     try {
       const reply = await assistantApi.turn(conversationId, prompt);
       if (current === chatSession.current) {
-        setMessages(previous => [...previous, { role: 'assistant', text: reply.response, sources: reply.sources }]);
+        setMessages(previous => [...previous, { role: 'assistant', text: reply.response, sources: reply.sources, model: reply.model }]);
         setApproval(reply.approval || null);
       }
     } catch (e) { if (current === chatSession.current) {
@@ -177,6 +177,7 @@ export default function AI({ farmer, setPage, reviewOrder }) {
         {messages.length === 0 && !approval && !starting && <p className="muted">{t('What would you like to ask about seeds, farm costs or group buying?')}</p>}
         {messages.map((message, index) => <article className={`farm-message ${message.role}`} key={index}>
           <strong>{message.role === 'user' ? t('You') : t('Farm assistant')}</strong><p>{message.text}</p>
+          {message.role === 'assistant' && message.model && <small>{message.model === 'AgriTech' ? t('Verified farm facts') : t('AI advice · {model}', { model: message.model })}</small>}
           {!!message.sources?.length && <details className="farm-source-details"><summary>{t('Sources ({n})', { n: message.sources.length })}</summary><ul className="farm-sources">{message.sources.map(source => <li key={source.id}>
             {source.url?.startsWith('https://') ? <a href={source.url} target="_blank" rel="noreferrer">{source.title}</a> : source.title}
             {source.region && <small>{source.region}</small>}
@@ -226,6 +227,8 @@ export default function AI({ farmer, setPage, reviewOrder }) {
     </section>
     <section className="farm-insights">
       <div className="farm-section-head"><h2>{t('Group-buying opportunities')}</h2><button className="primary" onClick={generate} disabled={refreshing}>{refreshing ? t('Checking...') : t('Find opportunities')}</button></div>
+      <button className="secondary" disabled={sending || starting || !conversationId || !!approval}
+        onClick={event => { send(event, 'Recommend group-buying opportunities for my farm and explain what to check before buying.'); document.getElementById('assistant-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>{t('Get AI buying advice')}</button>
       {opportunityError && <p className="farm-error" role="alert">{opportunityError}</p>}
       {items.length ? <div className="buying-opportunities">{items.map(item =>
         <BuyingOpportunity key={item.id} item={item} reviewOrder={reviewOrder} requestReview={requestReview}

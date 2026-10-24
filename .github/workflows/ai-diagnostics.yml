@@ -1,0 +1,152 @@
+name: AI diagnostics (read-only)
+
+on:
+  push:
+    branches: [ops/ai-diagnostics]
+    paths: [.github/workflows/ai-diagnostics.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-diagnostics-read-only
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Inspect aggregate AI readiness without changing services or data
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 5m
+          script: |
+            set -eu
+            project=agritech-end-to-end
+            container_for() {
+              docker ps --filter "label=com.docker.compose.project=$project" \
+                --filter "label=com.docker.compose.service=$1" --format '{{.ID}}' | head -1
+            }
+
+            echo '===== Runtime resources (no environment values)'
+            date -u
+            df -h / || true
+            free -m || true
+            for service in postgres spring-app frontend langchain-service ollama segmentation-service segmentation-worker document-service; do
+              id=$(container_for "$service")
+              if [ -n "$id" ]; then
+                printf '%s: ' "$service"
+                docker inspect --format 'status={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}not-configured{{end}} restarts={{.RestartCount}}' "$id"
+                docker stats --no-stream --format 'cpu={{.CPUPerc}} memory={{.MemUsage}} memory_percent={{.MemPerc}}' "$id" || true
+              else
+                printf '%s: no running container\n' "$service"
+              fi
+            done
+
+            echo '===== Consented-profile counts, saved job state and model report summaries'
+            segmentation=$(container_for segmentation-service)
+            if [ -n "$segmentation" ]; then
+              docker exec -i -e PYTHONDONTWRITEBYTECODE=1 "$segmentation" python - <<'PY'
+            import json
+            import os
+            from datetime import datetime, timezone
+            from pathlib import Path
+            from app.store import Store
+
+            result = {"observedAt": datetime.now(timezone.utc).isoformat(),
+                "minimumTrainingProfiles": int(os.getenv("SEGMENTATION_MIN_PROFILES", "30"))}
+            try:
+                with Store().connect() as connection:
+                    connection.execute("SET TRANSACTION READ ONLY")
+                    counts = connection.execute("""SELECT count(*),
+                        count(*) FILTER (WHERE data->>'analyticsConsent'='true')
+                        FROM market_intelligence.profiles""").fetchone()
+                    result["profiles"] = {"total": counts[0], "analyticsConsented": counts[1]}
+                    rows = connection.execute("""SELECT name,completed_at,
+                        jsonb_build_object('status',data->'status','profiles',data->'profiles',
+                            'minimum',data->'minimum','algorithm',data->'algorithm',
+                            'qualityGate',data->'qualityGate','trainingPeriod',data->'trainingPeriod',
+                            'candidatePresent',data->>'candidate' IS NOT NULL,
+                            'activePresent',data->>'active' IS NOT NULL)
+                        FROM market_intelligence.jobs
+                        WHERE name IN ('monthly_training','model_monitor','nightly_snapshot','worker_status') ORDER BY name""").fetchall()
+                    result["jobs"] = [{"name": name, "completedAt": completed.isoformat(),
+                        **{key: value for key, value in data.items() if value is not None}}
+                        for name, completed, data in rows]
+                    snapshot = connection.execute("""SELECT snapshot_day,
+                        data->'segmentation'->'learnedProfiles',data->'segmentation'->'ruleProfiles'
+                        FROM market_intelligence.snapshots ORDER BY snapshot_day DESC LIMIT 1""").fetchone()
+                    result["snapshot"] = ({"day": snapshot[0].isoformat(), "learnedProfiles": snapshot[1],
+                        "ruleProfiles": snapshot[2]} if snapshot else None)
+                    result["databaseStatus"] = "read_only_queries_completed"
+            except Exception as error:
+                # Do not print exception messages: database errors can contain account or connection values.
+                result["databaseStatus"] = "unavailable"
+                result["databaseErrorType"] = type(error).__name__
+
+            root = Path(os.getenv("MODEL_DIR", "/data/models"))
+            reports = {}
+            for name in ("candidate", "active"):
+                report_path = root / (name + ".json")
+                entry = {"reportExists": report_path.is_file(), "modelExists": (root / (name + ".joblib")).is_file()}
+                if entry["reportExists"]:
+                    try:
+                        report = json.loads(report_path.read_text())
+                        entry.update({key: report.get(key) for key in ("status", "algorithm", "profiles", "qualityGate", "silhouette")})
+                        sizes = list(report.get("clusterSizes", {}).values())
+                        entry["clusters"] = len(sizes)
+                        entry["smallestClusterProfiles"] = min(sizes) if sizes else None
+                        entry["reviewRecorded"] = str(report.get("reviewStatus", "")).startswith("Reviewed by ")
+                        entry["cohortCompatibility"] = "not_checked_without_individual_profile_rows"
+                    except Exception as error:
+                        entry["reportErrorType"] = type(error).__name__
+                reports[name] = entry
+            result["artifacts"] = reports
+            print(json.dumps(result, indent=2))
+            PY
+            else
+              echo 'Segmentation API is not running; database/artifact summaries were not collected.'
+            fi
+
+            echo '===== Worker error counters (no raw application log lines)'
+            worker=$(container_for segmentation-worker)
+            if [ -n "$worker" ]; then
+              docker logs --since 24h --tail 2000 "$worker" 2>&1 | docker exec -i -e PYTHONDONTWRITEBYTECODE=1 "$worker" python -c '
+            import json, sys
+            lines = sys.stdin.read().splitlines()
+            print(json.dumps({"sampleLines": len(lines), "window": "last 2000 log lines within 24 hours",
+                "snapshotFailures": sum("snapshot failed" in line.lower() for line in lines),
+                "trainingFailures": sum("training failed" in line.lower() for line in lines),
+                "tracebackBlocks": sum("Traceback (most recent call last)" in line for line in lines),
+                "errorMarkers": sum("ERROR" in line for line in lines)}, indent=2))'
+            else
+              echo 'Segmentation worker is not running.'
+            fi
+
+            echo '===== Configured Ollama model availability (no generation or model pull)'
+            langchain=$(container_for langchain-service)
+            if [ -n "$langchain" ]; then
+              docker exec -i -e PYTHONDONTWRITEBYTECODE=1 "$langchain" python - <<'PY'
+            import json
+            import os
+            from ollama import Client
+            result = {}
+            try:
+                Client(host=os.getenv("OLLAMA_BASE_URL", "http://ollama:11434"), timeout=8).show(
+                    os.getenv("AI_MODEL", "qwen2.5:1.5b"))
+                result["configuredModelAvailable"] = True
+            except Exception as error:
+                result["configuredModelAvailable"] = False
+                result["errorType"] = type(error).__name__
+            print(json.dumps(result))
+            PY
+            else
+              echo 'LangChain service is not running; configured model could not be checked.'
+            fi
+
+            echo 'Read-only diagnostics completed: no training, promotion, service changes or farmer-row output.'

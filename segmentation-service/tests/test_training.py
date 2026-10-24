@@ -6,10 +6,9 @@ from unittest.mock import patch
 
 import joblib
 import numpy as np
-from sklearn.exceptions import ConvergenceWarning
 from sklearn.metrics import adjusted_rand_score
 
-from app.training import NUMERIC, active_segment, active_segments, artifact_versions, cluster_silhouette, drift, invalidate_artifacts, promote, train
+from app.training import NUMERIC, active_segment, active_segments, artifact_versions, cluster_silhouette, drift, invalidate_artifacts, minimum_profiles, promote, train
 from test_engine import profile
 
 
@@ -39,12 +38,39 @@ class TrainingTest(unittest.TestCase):
 
     def test_identical_profiles_fail_quality_gate_and_cannot_be_promoted(self):
         profiles = [profile(str(i)) for i in range(30)]
-        with self.assertWarns(ConvergenceWarning):
-            result = train(profiles, track=False)
+        result = train(profiles, track=False)
+        self.assertEqual(result["status"], "insufficient_variation")
         self.assertFalse(result["qualityGate"])
         self.assertIsNone(result["silhouette"])
         with self.assertRaises(ValueError):
             promote("Reviewer", profiles)
+
+    def test_auto_k_recovers_two_supported_groups_instead_of_forcing_three(self):
+        profiles = [profile(str(i), crop="tomato" if i < 15 else "maize",
+                            hectares=2 if i < 15 else 100, capacityKg=1000 if i < 15 else 100000) for i in range(30)]
+        for algorithm in ("kmeans", "kprototypes"):
+            with self.subTest(algorithm=algorithm):
+                report = train(profiles, algorithm, track=False)
+                self.assertTrue(report["qualityGate"])
+                self.assertEqual(report["selectedClusters"], 2)
+                self.assertEqual(sorted(report["clusterSizes"].values()), [15, 15])
+                self.assertEqual(report["clusterSelection"]["method"], "best_valid_silhouette")
+                self.assertIsNone(active_segment(profiles[0], profiles))
+
+    def test_explicit_pilot_minimum_respects_two_groups_of_five_and_still_requires_review(self):
+        with patch.dict(os.environ, {"SEGMENTATION_MIN_PROFILES": "9"}):
+            with self.assertRaises(ValueError):
+                minimum_profiles()
+        profiles = [profile(str(i), crop="tomato" if i < 5 else "maize", hectares=2 if i < 5 else 100,
+                            capacityKg=1000 if i < 5 else 100000) for i in range(10)]
+        self.assertEqual(train(profiles, track=False)["status"], "cold_start")
+        with patch.dict(os.environ, {"SEGMENTATION_MIN_PROFILES": "10"}):
+            report = train(profiles, track=False)
+            self.assertEqual(report["minimum"], 10)
+            self.assertTrue(report["qualityGate"])
+            self.assertIsNone(active_segment(profiles[0], profiles))
+            promote("Pilot reviewer", profiles)
+            self.assertEqual(active_segment(profiles[0], profiles)["method"], "kmeans")
 
     def test_real_kmeans_train_review_and_consent_invalidation(self):
         result = train(self.profiles, track=False)

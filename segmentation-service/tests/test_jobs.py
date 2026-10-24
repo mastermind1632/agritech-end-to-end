@@ -66,7 +66,7 @@ class JobsTest(unittest.TestCase):
         self.algorithms = []
         self.quality = True
 
-    def fake_train(self, profiles, algorithm="kmeans"):
+    def fake_train(self, profiles, algorithm="kmeans", k="auto"):
         self.attempts += 1
         self.algorithms.append(algorithm)
         report = {"status": "cold_start" if len(profiles) < 30 else "candidate", "profiles": len(profiles),
@@ -212,6 +212,24 @@ class JobsTest(unittest.TestCase):
         self.assertIn("nightly_snapshot", self.store.jobs)
         self.assertNotIn("monthly_training", self.store.jobs)
         self.assertEqual(fit.call_count, 2)
+        self.assertEqual(self.store.jobs["worker_status"]["data"]["trainingStatus"], "failed")
+        self.assertEqual(self.store.jobs["worker_status"]["data"]["snapshotStatus"], "up_to_date")
+
+    def test_worker_reports_every_cycle_without_repeating_daily_or_monthly_work(self):
+        self.cycle()
+        self.store.now += timedelta(minutes=5)
+        result = self.cycle()
+        self.assertEqual(result["snapshot"], "up_to_date")
+        self.assertEqual(result["training"]["status"], "up_to_date")
+        self.assertEqual(self.store.jobs["worker_status"]["completedAt"], self.store.now.isoformat())
+        self.assertEqual(self.attempts, 1)
+
+    def test_training_policy_change_rechecks_unchanged_cohort_once(self):
+        self.cycle()
+        self.store.jobs["monthly_training"]["data"].pop("trainingPolicyVersion")
+        self.assertIn("training_policy_changed", self.cycle()["training"]["trigger"])
+        self.cycle()
+        self.assertEqual(self.attempts, 2)
 
     def test_operator_algorithm_choice_is_preserved_during_recovery(self):
         self.store.job("monthly_training", {"status": "cold_start", "algorithm": "kprototypes"})

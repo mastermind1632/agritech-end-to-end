@@ -7,6 +7,29 @@ message history; `wrap_model_call` adds scope-specific finance, buying or agrono
 The graph chooses the route and adjusts output budgets rather than relying on native tool calling
 unsupported by the small configured Qwen model. Current verified data takes priority over history.
 
+Produce and group-buying recommendations now invoke Qwen for a practical explanation and next
+steps, including when there are no matching buyers or open orders. The application keeps recorded
+profile values, matching results, quantities and prices in a separate facts block; the model adds
+advice without rewriting those figures. Its context contains allowlisted production and listing
+fields, without private coordinates, account identifiers or contact details. Invalid or unavailable
+generation returns the facts and an explicitly labelled fallback. Responses include `advice.status`
+(`generated` or `fallback`), `advice.reason`, and `advice.modelInvoked`; only accepted generated
+advice is labelled with the configured Qwen model. Financial totals and approval actions keep their
+verified handling.
+
+The default is now `qwen2.5:1.5b` after real-generation comparison with the earlier 0.5b model.
+Both Spring and LangChain use the same configurable `AI_MODEL`; deployment checks read that
+configuration instead of hardcoding a different tag. Recommendation generations use a bounded
+context and output budget. The [official model registry](https://ollama.com/library/qwen2.5)
+lists the available model sizes. This model change does not establish agronomic or commercial accuracy.
+
+Market Insights provides **Get AI advice for my farm**, and Buying Tips provides **Get AI buying
+advice**. Farm grouping and generated advice have separate readiness: useful advice can use the
+farmer's own profile before a reviewed shared clustering model exists. A read-only production check
+on 25 October 2026 found three production profiles, only two with analytics consent, no fitted
+candidate/active artifacts and no recorded worker failures. This establishes a data limitation,
+not production accuracy for K-means. The interface now explains the actual grouping fallback.
+
 Conversation operations authenticate the current JWT through Spring on every request. The browser
 cannot submit a farmer ID to select someone else's memory. JWTs are transient runtime context,
 not graph state or checkpoint config. Validation, a 20-turn/minute per-farmer limit, a 50-conversation
