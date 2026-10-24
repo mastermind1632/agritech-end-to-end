@@ -4,7 +4,7 @@ services:
     environment:
       OLLAMA_BASE_URL: http://ollama:11434
       AI_LANGCHAIN_URL: http://langchain-service:8001
-      AI_MODEL: ${AI_MODEL:-qwen2.5:0.5b}
+      AI_MODEL: ${AI_MODEL:-qwen2.5:1.5b}
 
   ollama:
     image: ${OLLAMA_IMAGE:-ollama/ollama:latest}
@@ -22,7 +22,7 @@ services:
     environment:
       OLLAMA_HOST: http://ollama:11434
     entrypoint: ["/bin/ollama"]
-    command: ["pull", "${AI_MODEL:-qwen2.5:0.5b}"]
+    command: ["pull", "${AI_MODEL:-qwen2.5:1.5b}"]
     depends_on:
       ollama:
         condition: service_healthy
@@ -34,7 +34,7 @@ services:
     restart: unless-stopped
     environment:
       OLLAMA_BASE_URL: http://ollama:11434
-      AI_MODEL: ${AI_MODEL:-qwen2.5:0.5b}
+      AI_MODEL: ${AI_MODEL:-qwen2.5:1.5b}
       AI_BACKEND_URL: http://spring-app:8080
       AI_CHECKPOINT_DB: /home/app/.local/share/agritech/checkpoints.sqlite
       LANGSMITH_TRACING: "false"

@@ -138,7 +138,7 @@ jobs:
             result = {}
             try:
                 Client(host=os.getenv("OLLAMA_BASE_URL", "http://ollama:11434"), timeout=8).show(
-                    os.getenv("AI_MODEL", "qwen2.5:0.5b"))
+                    os.getenv("AI_MODEL", "qwen2.5:1.5b"))
                 result["configuredModelAvailable"] = True
             except Exception as error:
                 result["configuredModelAvailable"] = False

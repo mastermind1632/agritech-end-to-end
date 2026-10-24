@@ -17,6 +17,12 @@ generation returns the facts and an explicitly labelled fallback. Responses incl
 advice is labelled with the configured Qwen model. Financial totals and approval actions keep their
 verified handling.
 
+The default is now `qwen2.5:1.5b` after real-generation comparison with the earlier 0.5b model.
+Both Spring and LangChain use the same configurable `AI_MODEL`; deployment checks read that
+configuration instead of hardcoding a different tag. Recommendation generations use a bounded
+context and output budget. The [official model registry](https://ollama.com/library/qwen2.5)
+lists the available model sizes. This model change does not establish agronomic or commercial accuracy.
+
 Market Insights provides **Get AI advice for my farm**, and Buying Tips provides **Get AI buying
 advice**. Farm grouping and generated advice have separate readiness: useful advice can use the
 farmer's own profile before a reviewed shared clustering model exists. A read-only production check

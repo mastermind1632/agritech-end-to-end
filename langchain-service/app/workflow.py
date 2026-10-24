@@ -410,7 +410,7 @@ class Workflow:
         invoked = False
         if self.model_slots.acquire(blocking=False):
             try:
-                model = self.model_factory({'temperature': 0.1, 'num_predict': 260}, state['route'])
+                model = self.model_factory({'temperature': 0.1, 'num_predict': 180, 'num_ctx': 4096}, state['route'])
                 agent = create_agent(model=model, tools=[], system_prompt=ADVICE_SYSTEM)
                 with self.telemetry.span('qwen_recommendation_advice', 'llm'):
                     invoked = True

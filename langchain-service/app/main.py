@@ -14,7 +14,7 @@ from ollama import Client, ResponseError
 from pydantic import BaseModel, Field, StrictBool, model_validator
 from app.workflow import Backend, Workflow
 
-MODEL = os.environ.get("AI_MODEL", "qwen2.5:0.5b")
+MODEL = os.environ.get("AI_MODEL", "qwen2.5:1.5b")
 OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 app = FastAPI(title="AgriTech LangGraph Service", version="2.0.0")
 _engine = None
@@ -64,6 +64,7 @@ def model_factory(options, route):
     return ChatOllama(model=MODEL, base_url=OLLAMA_URL,
         temperature=options.get("temperature", 0.1),
         num_predict=options.get("num_predict", 200 if route in ("finance", "buying") else 250),
+        num_ctx=options.get("num_ctx", 8192),
         client_kwargs={"timeout": 180})
 
 

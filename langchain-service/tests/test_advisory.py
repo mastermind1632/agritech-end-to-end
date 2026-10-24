@@ -223,6 +223,15 @@ class AdvisoryContextTests(unittest.TestCase):
         repeated = ('Review the crop and delivery limits before contacting a recorded buyer. ' * 20)
         self.assertIsNone(checked_advice(repeated, 'produce', {}, 'tomato harvest'))
 
+    def test_supported_actions_survive_markdown_headings_without_inventing_grade(self):
+        text = ('1. **Publish an Offer**: Share your tomato harvest in Produce Markets with the details you can confirm. '
+                'Highlight the harvest timing and packaging so buyers can judge suitability. '
+                'Your grade is premium.')
+        advice = checked_advice(text, 'produce', {'matchCount': 0}, 'tomato harvest')
+        self.assertIn('Share your tomato harvest', advice)
+        self.assertIn('Highlight the harvest timing', advice)
+        self.assertNotIn('premium', advice)
+
 
 if __name__ == '__main__':
     unittest.main()

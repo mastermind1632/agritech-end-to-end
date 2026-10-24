@@ -20,6 +20,8 @@ ADVICE_SYSTEM = (
     'Produce Markets is for selling harvested crops. Marketplace and Group Orders are only for buying farm inputs. '
     'When no buyer matches, do not advise changing the crop, reducing production or buying other produce. '
     'Use crop, harvest timing, capacity and delivery limits when supplied. '
+    'Seasonal capacity is a limit, not available stock. Produce grade, packaging, delivery charges and payment terms '
+    'are unknown: ask the farmer to confirm them rather than asserting values. Consistent production does not establish a grade. '
     'The app displays exact figures separately: do not repeat numbers, prices, dates, business names or contact details. '
     'Do not promise yields, profit, discounts or deliveries. Do not claim to place orders, pay, contact people or change records. '
     'Use plain English, address the farmer as you, and write about 60 to 100 words. '
@@ -74,7 +76,8 @@ _OPENERS = set(('Your You The This These That It Its A An If When Where Before A
                 'Since Because Given Based By As No There Here Next First Also Then Finally Instead In On '
                 'Check Confirm Ask Review Update Contact Compare Publish Prepare Complete Discuss Record Plan '
                 'Open Keep Start Choose Consider Focus Look Avoid Seek Ensure Make Build Work Prioritise Prioritize '
-                'Use Set Aim Try Take Learn Match Align Assess Talk I').lower().split())
+                'Use Set Aim Try Take Learn Match Align Assess Talk Share Highlight Monitor Regularly '
+                'Verify Inspect Schedule List Gather Identify Request Read Speak Describe Include Offer I').lower().split())
 
 
 def checked_advice(text, route, context, facts):
@@ -87,6 +90,7 @@ def checked_advice(text, route, context, facts):
     text = re.sub(r'<think>.*?</think>', '', text, flags=re.S | re.I).strip()
     if '```' in text or len(text) > 1600 or len(text.split()) > 180:
         return None
+    text = re.sub(r'(?m)^\s*(?:\d+[.)]\s*|[-*]\s*)?\*\*[^*\n]{1,100}\*\*:\s*', '', text)
     text = text.replace('**', '').replace('__', '')
     known = set(re.findall(r'[A-Za-z]+', facts + ' ' + json.dumps(context))).union(
         {'Marketplace', 'Produce', 'Markets', 'Group', 'Orders', 'AgriTech', 'AI', 'Insights'})
@@ -101,6 +105,8 @@ def checked_advice(text, route, context, facts):
                 or re.search(r'\b(?:change|adjust|switch|alternative|reduce)\b.*\b(?:crop|produce|production)\b', sentence, re.I)):
             continue
         if route == 'produce' and not context.get('matchCount') and re.search(r'\b(?:your|current) buyers\b', sentence, re.I):
+            continue
+        if route == 'produce' and re.search(r'\bgrade\s*[:(]|\bgrade\s+is\b', sentence, re.I):
             continue
         capitals = list(re.finditer(r'\b[A-Z][A-Za-z]+\b', sentence))
         if any(match.group().lower() not in known and not (match.start() == 0 and match.group().lower() in _OPENERS)

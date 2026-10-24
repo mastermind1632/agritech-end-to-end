@@ -160,11 +160,11 @@ jobs:
             echo "Waiting for Ollama (attempt $attempt)"
             sleep 2
           done
-          docker exec ollama-cpu-smoke ollama pull qwen2.5:0.5b
+          docker exec ollama-cpu-smoke ollama pull qwen2.5:1.5b
           python - <<'PY'
           import json
           from urllib.request import Request, urlopen
-          body = {"model": "qwen2.5:0.5b", "prompt": "What should I check before buying crop seeds?",
+          body = {"model": "qwen2.5:1.5b", "prompt": "What should I check before buying crop seeds?",
                   "stream": False, "options": {"num_predict": 40}}
           request = Request("http://127.0.0.1:11434/api/generate", data=json.dumps(body).encode(),
                             headers={"Content-Type": "application/json"})
@@ -341,7 +341,7 @@ jobs:
               "OLLAMA_IMAGE": "ghcr.io/" + os.environ["GITHUB_REPOSITORY_OWNER"].lower() + "/agritech-ollama-cpu:" + os.environ["GITHUB_SHA"],
               "POSTGRES_PASSWORD": os.environ["POSTGRES_PASSWORD"],
               "APP_JWT_SECRET": os.environ["APP_JWT_SECRET"],
-              "AI_MODEL": "qwen2.5:0.5b",
+              "AI_MODEL": "qwen2.5:1.5b",
               "AI_LANGSMITH_TRACING": "false",
               "CERTBOT_IMAGE": "ghcr.io/" + os.environ["GITHUB_REPOSITORY_OWNER"].lower() + "/agritech-certbot:" + os.environ["GITHUB_SHA"],
           }
