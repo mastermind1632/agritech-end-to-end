@@ -95,7 +95,9 @@ public class FarmerService {
                     + Math.max(1, limiter.retryAfterSeconds(key, WINDOW_MS) / 60) + " minute(s) and try again, or reset your password.");
         }
         String id = contact.trim();
-        Farmer farmer = (id.contains("@") ? farmerRepository.findByEmailIgnoreCase(id) : farmerRepository.findByContact(id))
+        Farmer farmer = (id.contains("@")
+                ? farmerRepository.findByEmailIgnoreCase(id).or(() -> farmerRepository.findByContact(id))
+                : farmerRepository.findByContact(id))
                 .orElseThrow(() -> failed(contact));
         if (farmer.getPasswordHash() == null || !passwordEncoder.matches(password, farmer.getPasswordHash())) {
             throw failed(contact);

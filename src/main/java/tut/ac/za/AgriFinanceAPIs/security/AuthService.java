@@ -135,7 +135,9 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many reset requests. Please try again later.");
         }
         String id = identifier.trim();
-        Optional<Farmer> found = id.contains("@") ? farmers.findByEmailIgnoreCase(id) : farmers.findByContact(id);
+        Optional<Farmer> found = id.contains("@")
+                ? farmers.findByEmailIgnoreCase(id).or(() -> farmers.findByContact(id))
+                : farmers.findByContact(id);
         if (found.isEmpty() || !found.get().isActive()) return out;
         Farmer f = found.get();
         String raw = Hashing.randomToken(32);
@@ -145,7 +147,11 @@ public class AuthService {
         t.setExpiresAt(LocalDateTime.now().plusMinutes(30));
         resetTokens.save(t);
         String link = publicUrl + "/?reset=" + raw;
-        channels.sendSecurityMessage(f.getEmail(), f.getContact(), "Reset your AgriTech password",
+        String email = f.getEmail();
+        if ((email == null || email.isBlank()) && f.getContact() != null && f.getContact().contains("@")) {
+            email = f.getContact();
+        }
+        channels.sendSecurityMessage(email, f.getContact(), "Reset your AgriTech password",
                 "Someone asked to reset the password for your AgriTech account. Open this link within 30 minutes to choose a new password:\n"
                         + link + "\nIf this was not you, ignore this message.");
         audit.record(f.getId(), "PASSWORD_RESET_REQUESTED", "FARMER", f.getId(), null);
