@@ -33,12 +33,24 @@ remains the commerce team's responsibility. No recommendation places an order.
   recommendation impressions/feedback, sourced market observations, snapshots and job status.
   The worker runs a daily snapshot and monthly candidate training; failed jobs retry every five minutes.
 - K-Means uses one-hot crops/provinces, standardized area/capacity and sine/cosine months.
+  K-Means and K-Prototypes compare two to six cluster counts, bounded by distinct profiles and
+  a minimum of five farms per proposed group. The best validated silhouette score wins, with
+  fewer groups breaking ties. A fixed count can be requested with `--clusters N` for review.
   K-Prototypes uses scaled numeric/cyclical features plus categorical crops/provinces.
   HDBSCAN uses GPS radians and haversine distance. Silhouette scores, cluster sizes and noise
   are recorded, with understandable segment names.
 - Below 30 consented profiles, the service stays on rules. Candidate models require at least
   two clusters, at least five members per cluster and silhouette >= 0.1, then named human review
   before promotion. Those thresholds are pilot defaults, not proof of agronomic validity.
+  Thirty is an application policy, not a mathematical requirement of K-means. An operator can
+  explicitly set `SEGMENTATION_MIN_PROFILES` for a smaller pilot, with a hard floor of ten
+  (two groups of five); quality checks and named review still apply. Production keeps thirty.
+- Recommendations return `segmentationStatus` with a specific fallback reason, aggregate consented
+  count, policy minimum and next action. Consent off, insufficient data, failed quality checks,
+  pending review, changed cohorts and unsupported profiles are distinct states. A `worker_status`
+  heartbeat records both analytics phases each cycle; old daily/monthly timestamps do not imply
+  worker failure. `productionContext` exposes only the signed-in farmer's allowlisted production
+  fields for grounded advice, excluding coordinates, account IDs and contact information.
 - MLflow records experiment parameters, version and aggregate evaluation. Private fitted models
   and identifier-to-cluster assignments stay in the local persistent volume. No private farmer
   records are uploaded to an external experiment tracker.
@@ -138,12 +150,18 @@ port and a trusted certificate is issued, use the HTTPS overlay and `RELEASE_HTT
 
 ```sh
 docker compose -f docker-compose.prod.yml -f docker-compose.segmentation.yml exec segmentation-service python -m app.jobs snapshot
+docker compose -f docker-compose.prod.yml -f docker-compose.segmentation.yml exec segmentation-service python -m app.diagnostics
 docker compose -f docker-compose.prod.yml -f docker-compose.segmentation.yml exec segmentation-service python -m app.jobs train --algorithm kmeans
 docker compose -f docker-compose.prod.yml -f docker-compose.segmentation.yml exec segmentation-service python -m app.jobs train --algorithm kprototypes
 docker compose -f docker-compose.prod.yml -f docker-compose.segmentation.yml exec segmentation-service python -m app.jobs train --algorithm hdbscan
 docker compose -f docker-compose.prod.yml -f docker-compose.segmentation.yml exec segmentation-service python -m app.jobs promote --reviewed-by "Named agronomist"
 docker compose -f docker-compose.prod.yml -f docker-compose.segmentation.yml exec segmentation-service python -m app.jobs experiments
 ```
+
+The diagnostic command checks installed model dependencies and aggregate readiness without
+training or promotion. The `AI diagnostics (read-only)` GitHub workflow also checks live counts,
+saved report metadata, worker error counters, container health and configured Ollama availability.
+It prints no farmer rows, coordinates, credentials or reviewer names and changes no live data.
 
 Enable the pilot experiment with `SEGMENTATION_AB_TEST=true` only after agreeing consent,
 traffic allocation, sample size, monitoring and a stopping rule. It compares two rule-based

@@ -17,7 +17,9 @@ def followup(question, messages=()):
                 or re.fullmatch(r"(in )?(maize|tomato(es)?|beans|cabbage|limpopo|gauteng|polokwane)", text))
     if explicit:
         return True
-    last = messages[-1]["text"].lower() if messages and messages[-1]["role"] == "assistant" else ""
+    # Supplementary AI advice must not hide the application's crop/town question.
+    last_message = messages[-1] if messages and messages[-1]['role'] == 'assistant' else {}
+    last = ((last_message.get('advice') or {}).get('clarification') or last_message.get('text', '')).lower()
     return bool(last.endswith('?') and re.search(r"which (crop|town)|your farm near", last)
                 and len(text.split()) <= 6 and '?' not in question
                 and not re.search(FINANCE_TERMS, text)

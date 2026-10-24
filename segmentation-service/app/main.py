@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from app.engine import RULE_VERSION, demand_summary, experiment_arm, matches, segment, services
 from app.models import CROPS, PROVINCES, FarmProfile, Feedback, MarketRecord
 from app.outcomes import create_router
+from app.readiness import model_readiness
 from app.store import Store
 from app.training import active_segment
 
@@ -141,14 +142,19 @@ def remove_record(record_id: UUID, owner=Depends(identity)):
 @app.get("/api/recommendations")
 def recommendations(owner=Depends(identity)):
     p = required_profile(owner)
-    learned = active_segment(p, store.profiles())
+    profiles = store.profiles()
+    learned = active_segment(p, profiles)
+    readiness = model_readiness(profiles, p, learned, store.job("monthly_training"), store.job("worker_status"))
     cohort = learned or {"name": segment(p), "method": "rules", "version": RULE_VERSION,
-                         "reviewStatus": "Rule-based grouping; no trained model is active"}
+                         "reviewStatus": readiness["message"]}
     arm = experiment_arm(owner, os.getenv("ENABLE_AB_TEST", "false").lower() == "true" and p["analyticsConsent"])
     found = matches(p, store.records(kind="demand", crop=p["crop"]), owner, arm=arm, exposure=store.exposure())
     impression = store.impression(owner, arm, cohort["version"], found) if p["analyticsConsent"] else None
     trend = store.expense_trend(owner) if p["expenseConsent"] else None
     return {"segment": cohort, "recommendations": [public_record(r) for r in found],
+            "segmentationStatus": readiness,
+            "productionContext": {key: p[key] for key in ("crop", "province", "district", "hectares", "capacityKg",
+                "plantingMonth", "harvestMonth", "deliveryRadiusKm", "businessRegistered", "consistentProduction")},
             "services": services(p, trend), "impressionId": impression, "experimentArm": arm,
             "notice": "Independent matches; combined requests may exceed your seasonal capacity. No orders have been placed."}
 

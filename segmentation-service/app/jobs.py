@@ -9,7 +9,8 @@ from datetime import datetime, timezone
 from app.engine import RULE_VERSION, cohort_fingerprint, demand_summary, market_forecasts, segment
 from app.models import MarketPrice
 from app.store import Store
-from app.training import active_segments, artifact_versions, drift, promote, train
+from app.training import (TRAINING_POLICY_VERSION, active_segments, artifact_versions, drift,
+                          minimum_profiles, promote, train)
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +50,10 @@ def snapshot(store):
 
 
 def training_status(report, current):
-    fields = ("status", "profiles", "minimum", "version", "algorithm", "qualityGate", "reviewStatus", "fingerprint")
-    return {**{key: report[key] for key in fields if key in report}, "trainingPeriod": _utc(current).strftime("%Y-%m")}
+    fields = ("status", "profiles", "minimum", "version", "algorithm", "qualityGate", "qualityFailures",
+              "selectedClusters", "requestedClusters", "reviewStatus", "fingerprint")
+    return {**{key: report[key] for key in fields if key in report}, "minimum": report.get("minimum", minimum_profiles()),
+            "trainingPolicyVersion": TRAINING_POLICY_VERSION, "trainingPeriod": _utc(current).strftime("%Y-%m")}
 
 
 def _training_cycle(store, current):
@@ -66,6 +69,8 @@ def _training_cycle(store, current):
             reasons.append("monthly_schedule")
         if last.get("fingerprint") != cohort_fingerprint(profiles):
             reasons.append("cohort_changed")
+        if last.get("trainingPolicyVersion") != TRAINING_POLICY_VERSION or last.get("minimum") != minimum_profiles():
+            reasons.append("training_policy_changed")
         if last.get("status") == "candidate" and versions["candidate"] is None:
             reasons.append("candidate_missing")
         if monitored.get("active") and versions["active"] is None:
@@ -73,7 +78,7 @@ def _training_cycle(store, current):
         result = {"status": "up_to_date"}
         if reasons:
             algorithm = last.get("algorithm", "kmeans")
-            report = train(profiles, algorithm=algorithm)
+            report = train(profiles, algorithm=algorithm, k=last.get("requestedClusters", "auto"))
             result = {**training_status(report, current), "trigger": reasons}
             store.job("monthly_training", result)
             versions = artifact_versions()
@@ -102,6 +107,11 @@ def run_cycle(store, current=None):
     except Exception:
         logger.exception("Market intelligence training failed; will retry")
         result["training"] = {"status": "failed"}
+    try:
+        store.job("worker_status", {"checkedAt": current.isoformat(), "snapshotStatus": result["snapshot"],
+                                    "trainingStatus": result["training"]["status"]})
+    except Exception:
+        logger.exception("Market intelligence worker heartbeat could not be recorded")
     return result
 
 
@@ -115,6 +125,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("command", choices=["snapshot", "train", "promote", "import-prices", "experiments", "worker"])
     parser.add_argument("--algorithm", choices=["kmeans", "kprototypes", "hdbscan"], default="kmeans")
+    parser.add_argument("--clusters", default="auto", help="auto selects a validated cluster count; or specify an integer >=2")
     parser.add_argument("--reviewed-by", default="")
     parser.add_argument("--csv")
     args = parser.parse_args()
@@ -133,7 +144,7 @@ def main():
     if args.command == "snapshot":
         result = snapshot(store)
     elif args.command == "train":
-        result = store.with_cohort_lock(lambda profiles: train(profiles, args.algorithm))
+        result = store.with_cohort_lock(lambda profiles: train(profiles, args.algorithm, k=args.clusters))
         store.job("monthly_training", training_status(result, datetime.now(timezone.utc)))
         store.job("model_monitor", artifact_versions())
     elif args.command == "promote":

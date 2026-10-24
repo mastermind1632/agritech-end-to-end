@@ -119,7 +119,11 @@ def create(authorization: str = Header(default="")):
 @app.get("/api/conversations/{conversation_id}")
 def get(conversation_id: UUID, authorization: str = Header(default="")):
     workflow = engine()
-    return protected(lambda: workflow.get(workflow.backend.identity(authorization), str(conversation_id)))
+    result = protected(lambda: workflow.get(workflow.backend.identity(authorization), str(conversation_id)))
+    for message in result['messages']:
+        if message.get('model') == 'Qwen':
+            message['model'] = MODEL
+    return result
 
 
 @app.delete("/api/conversations/{conversation_id}")

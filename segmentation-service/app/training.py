@@ -18,8 +18,34 @@ from app.engine import cohort_fingerprint, feature_rows, segment
 NUMERIC = ["hectares", "capacityKg", "plantingMonth_sin", "plantingMonth_cos", "harvestMonth_sin", "harvestMonth_cos"]
 CATEGORIES = ["crop", "province"]
 MIN_PROFILES = 30
+MIN_CLUSTERS = 2
+MIN_CLUSTER_PROFILES = 5
+MIN_SILHOUETTE = 0.1
+MAX_AUTO_CLUSTERS = 6
+TRAINING_POLICY_VERSION = "auto-k-v1"
 MAX_SILHOUETTE_PROFILES = 2000
 PREDICTION_RADIUS_MULTIPLIER = 1.5
+
+
+def minimum_profiles():
+    minimum = int(os.getenv("SEGMENTATION_MIN_PROFILES", str(MIN_PROFILES)))
+    if minimum < MIN_CLUSTERS * MIN_CLUSTER_PROFILES:
+        raise ValueError("SEGMENTATION_MIN_PROFILES must allow at least two groups of five farms")
+    return minimum
+
+
+def quality_failures(labels, score):
+    counts = Counter(int(label) for label in labels if label >= 0)
+    failures = []
+    if len(counts) < MIN_CLUSTERS:
+        failures.append("too_few_clusters")
+    if counts and min(counts.values()) < MIN_CLUSTER_PROFILES:
+        failures.append("cluster_too_small")
+    if score is None:
+        failures.append("silhouette_unavailable")
+    elif score < MIN_SILHOUETTE:
+        failures.append("clusters_not_well_separated")
+    return failures
 
 
 def cluster_silhouette(features, labels, metric="euclidean", gamma=None):
@@ -82,35 +108,74 @@ def artifact_versions():
     return versions
 
 
-def train(profiles, algorithm="kmeans", k=3, track=True):
+def train(profiles, algorithm="kmeans", k="auto", track=True):
     profiles = [p for p in profiles if p["analyticsConsent"]]
-    if len(profiles) < MIN_PROFILES:
-        return {"status": "cold_start", "profiles": len(profiles), "minimum": MIN_PROFILES,
+    minimum = minimum_profiles()
+    if len(profiles) < minimum:
+        return {"status": "cold_start", "profiles": len(profiles), "minimum": minimum,
+                "trainingPolicyVersion": TRAINING_POLICY_VERSION, "requestedClusters": k,
                 "fingerprint": cohort_fingerprint(profiles), "algorithm": algorithm, "qualityGate": False,
-                "reviewStatus": f"Rule-based grouping until at least {MIN_PROFILES} consented profiles are available"}
+                "qualityFailures": ["insufficient_profiles"],
+                "reviewStatus": f"Rule-based grouping until at least {minimum} consented profiles are available"}
     frame = pd.DataFrame(feature_rows(profiles))
     transform = ColumnTransformer([("numeric", StandardScaler(), NUMERIC),
                                    ("categorical", OneHotEncoder(handle_unknown="ignore", sparse_output=False), CATEGORIES)])
     features = transform.fit_transform(frame)
-    if algorithm == "kmeans":
-        model = KMeans(n_clusters=k, random_state=42, n_init=10)
-        labels = model.fit_predict(features)
-    elif algorithm == "kprototypes":
+    if algorithm == "kprototypes":
         from kmodes.kprototypes import KPrototypes
         mixed = np.column_stack((transform.named_transformers_["numeric"].transform(frame[NUMERIC]), frame[CATEGORIES].to_numpy()))
-        model = KPrototypes(n_clusters=k, init="Cao", n_init=5, random_state=42)
-        labels = model.fit_predict(mixed, categorical=[len(NUMERIC), len(NUMERIC) + 1])
+    selection = []
+    if algorithm in ("kmeans", "kprototypes"):
+        distinct = len(frame.drop_duplicates())
+        maximum = min(MAX_AUTO_CLUSTERS, len(profiles) // MIN_CLUSTER_PROFILES, distinct)
+        if distinct < MIN_CLUSTERS:
+            return {"status": "insufficient_variation", "profiles": len(profiles), "minimum": minimum,
+                    "trainingPolicyVersion": TRAINING_POLICY_VERSION, "requestedClusters": k,
+                    "fingerprint": cohort_fingerprint(profiles), "algorithm": algorithm, "qualityGate": False,
+                    "qualityFailures": ["insufficient_variation"], "silhouette": None,
+                    "reviewStatus": "At least two distinct production profiles are needed before clustering"}
+        choices = range(MIN_CLUSTERS, maximum + 1) if k == "auto" else [int(k)]
+        best = None
+        for clusters in choices:
+            if clusters < MIN_CLUSTERS or clusters > distinct or clusters > len(profiles):
+                raise ValueError("Choose at least two clusters, no more than the distinct production profiles")
+            try:
+                if algorithm == "kmeans":
+                    candidate_model = KMeans(n_clusters=clusters, random_state=42, n_init=10)
+                    candidate_features = features
+                    candidate_labels = candidate_model.fit_predict(candidate_features)
+                    candidate_score = cluster_silhouette(candidate_features, candidate_labels)
+                else:
+                    candidate_model = KPrototypes(n_clusters=clusters, init="Cao", n_init=5, random_state=42)
+                    candidate_features = mixed
+                    candidate_labels = candidate_model.fit_predict(mixed, categorical=[len(NUMERIC), len(NUMERIC) + 1])
+                    candidate_score = cluster_silhouette(mixed, candidate_labels, "kprototypes", candidate_model.gamma)
+            except ValueError:
+                # A candidate count can be impossible to initialize even when smaller counts fit.
+                selection.append({"clusters": clusters, "silhouette": None, "qualityGate": False,
+                                  "qualityFailures": ["fit_failed"]})
+                continue
+            failures = quality_failures(candidate_labels, candidate_score)
+            selection.append({"clusters": clusters, "silhouette": candidate_score,
+                              "qualityGate": not failures, "qualityFailures": failures})
+            rank = (not failures, candidate_score if candidate_score is not None else -1, -clusters)
+            if best is None or rank > best[0]:
+                best = (rank, candidate_model, candidate_labels, candidate_score)
+        if best is None:
+            raise ValueError("None of the tested cluster counts could be fitted; inspect the consenting training data")
+        _, model, labels, score = best
     elif algorithm == "hdbscan":
         model = HDBSCAN(min_cluster_size=5, metric="haversine")
         labels = model.fit_predict(np.radians([[p["latitude"], p["longitude"]] for p in profiles]))
+        score = cluster_silhouette(np.radians([[p["latitude"], p["longitude"]] for p in profiles]), labels, "haversine")
     else:
         raise ValueError("Choose kmeans, kprototypes or hdbscan")
     counts = Counter(int(x) for x in labels if x >= 0)
     evaluation = (np.radians([[p["latitude"], p["longitude"]] for p in profiles]) if algorithm == "hdbscan"
                   else mixed if algorithm == "kprototypes" else features)
     metric = {"hdbscan": "haversine", "kprototypes": "kprototypes"}.get(algorithm, "euclidean")
-    score = cluster_silhouette(evaluation, labels, metric, getattr(model, "gamma", None))
-    quality = len(counts) >= 2 and min(counts.values()) >= 5 and score is not None and score >= 0.1
+    failures = quality_failures(labels, score)
+    quality = not failures
     names = {}
     for label in counts:
         members = [p for p, assignment in zip(profiles, labels) if assignment == label]
@@ -122,10 +187,14 @@ def train(profiles, algorithm="kmeans", k=3, track=True):
         names[str(label)] = segment(typical)
     version = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ") + "-" + algorithm
     report = {"status": "candidate", "version": version, "algorithm": algorithm, "profiles": len(profiles),
+              "minimum": minimum, "trainingPolicyVersion": TRAINING_POLICY_VERSION, "requestedClusters": k,
               "silhouette": score, "clusterSizes": {str(c): n for c, n in counts.items()},
               "silhouetteMetric": "squared_euclidean_plus_gamma_matching" if algorithm == "kprototypes" else metric,
               "silhouetteSampleSize": min(int((labels >= 0).sum()), MAX_SILHOUETTE_PROFILES),
               "noiseProfiles": int((labels < 0).sum()), "qualityGate": quality,
+              "qualityFailures": failures, "selectedClusters": len(counts),
+              "clusterSelection": {"method": "best_valid_silhouette" if k == "auto" else "requested",
+                                   "tested": selection} if selection else {"method": "density"},
               "reviewStatus": "Agronomist/extension-officer review required", "segmentNames": names,
               "fingerprint": cohort_fingerprint(profiles),
               "baseline": {key: {"mean": float(frame[key].mean()), "std": float(frame[key].std())} for key in NUMERIC},
@@ -170,7 +239,10 @@ def promote(reviewed_by, profiles):
     if not reviewed_by.strip():
         raise ValueError("Record the human reviewer")
     root = artifact_dir()
-    payload = joblib.load(root / "candidate.joblib")
+    try:
+        payload = joblib.load(root / "candidate.joblib")
+    except FileNotFoundError as exc:
+        raise ValueError("No trained candidate is available; train and review a candidate first") from exc
     report = payload["report"]
     if not report["qualityGate"] or not _cohort_unchanged(payload, profiles):
         raise ValueError("Candidate failed quality checks or the consented cohort changed; retrain")
@@ -184,7 +256,7 @@ def promote(reviewed_by, profiles):
 
 
 def _active_payload(profiles):
-    path = artifact_dir() / "active.joblib"
+    path = Path(os.getenv("MODEL_DIR", "/data/models")) / "active.joblib"
     try:
         payload = joblib.load(path)
     except (OSError, EOFError, ValueError, pickle.UnpicklingError):
@@ -260,7 +332,7 @@ def invalidate_artifacts():
 def drift(profiles):
     profiles = [p for p in profiles if p["analyticsConsent"]]
     path = artifact_dir() / "active.json"
-    if not path.exists() or len(profiles) < MIN_PROFILES:
+    if not path.exists() or len(profiles) < minimum_profiles():
         return {"status": "insufficient_baseline"}
     try:
         report = json.loads(path.read_text())

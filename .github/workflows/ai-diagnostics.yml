@@ -58,7 +58,8 @@ jobs:
             from pathlib import Path
             from app.store import Store
 
-            result = {"observedAt": datetime.now(timezone.utc).isoformat(), "minimumTrainingProfiles": 30}
+            result = {"observedAt": datetime.now(timezone.utc).isoformat(),
+                "minimumTrainingProfiles": int(os.getenv("SEGMENTATION_MIN_PROFILES", "30"))}
             try:
                 with Store().connect() as connection:
                     connection.execute("SET TRANSACTION READ ONLY")
@@ -73,7 +74,7 @@ jobs:
                             'candidatePresent',data->>'candidate' IS NOT NULL,
                             'activePresent',data->>'active' IS NOT NULL)
                         FROM market_intelligence.jobs
-                        WHERE name IN ('monthly_training','model_monitor','nightly_snapshot') ORDER BY name""").fetchall()
+                        WHERE name IN ('monthly_training','model_monitor','nightly_snapshot','worker_status') ORDER BY name""").fetchall()
                     result["jobs"] = [{"name": name, "completedAt": completed.isoformat(),
                         **{key: value for key, value in data.items() if value is not None}}
                         for name, completed, data in rows]
