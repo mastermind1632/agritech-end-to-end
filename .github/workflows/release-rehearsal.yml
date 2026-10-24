@@ -1,0 +1,102 @@
+name: Release rehearsal (no live changes)
+
+# Starts the published backend against a temporary COPY of the live database, using the database
+# upgrade files from this branch, and prints its start-up log. The running site is never touched.
+on:
+  push:
+    branches: [ops/release-rehearsal]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rehearse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy this branch's database upgrade files to the server
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "src/main/resources/db/migration"
+          target: "~/agritech-rehearsal"
+          rm: true
+
+      - name: Rehearse the backend on a copy of the live database
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 15m
+          script: |
+            set -eu
+            TAG=7aa4e71876889ac62eb74a86c987f57789307969
+            LIVE_DB=agritech-end-to-end-postgres-1
+            NET=agritech-rehearsal-net
+            DB=agritech-rehearsal-db
+            APP=agritech-rehearsal-api
+            DUMP=/tmp/agritech-rehearsal.dump
+            MIG="$HOME/agritech-rehearsal/src/main/resources/db/migration"
+            cleanup() {
+              docker rm -f "$APP" "$DB" >/dev/null 2>&1 || true
+              docker network rm "$NET" >/dev/null 2>&1 || true
+              rm -f "$DUMP"
+              rm -rf "$HOME/agritech-rehearsal"
+            }
+            trap cleanup EXIT
+            docker rm -f "$APP" "$DB" >/dev/null 2>&1 || true
+            docker network rm "$NET" >/dev/null 2>&1 || true
+
+            echo '===== 1. Upgrade files under test'
+            chmod -R a+rX "$HOME/agritech-rehearsal"
+            ls -la "$MIG"
+            echo '===== LIVE database: recorded upgrades (read-only)'
+            docker exec "$LIVE_DB" psql -U postgres -d agritech -c \
+              "select installed_rank, version, description, success from flyway_schema_history order by installed_rank" \
+              || echo 'The live database has no flyway_schema_history table.'
+
+            echo '===== 2. Copying the live database (read-only dump)'
+            docker exec "$LIVE_DB" pg_dump -U postgres -d agritech -Fc > "$DUMP"
+            ls -la "$DUMP"
+            docker network create "$NET" >/dev/null
+            docker run -d --name "$DB" --network "$NET" --memory 768m \
+              -e POSTGRES_PASSWORD=rehearsal -e POSTGRES_DB=agritech postgres:18-alpine >/dev/null
+            for i in $(seq 1 90); do
+              if docker logs "$DB" 2>&1 | grep -q 'init process complete' && docker exec "$DB" pg_isready -U postgres -d agritech >/dev/null 2>&1; then break; fi
+              sleep 2
+            done
+            sleep 3
+            docker exec -i "$DB" pg_restore -U postgres -d agritech --no-owner --no-privileges < "$DUMP" \
+              || echo '(pg_restore reported warnings; continuing)'
+
+            echo '===== 3. Starting the backend against the copy, with the upgrade files above'
+            docker run -d --name "$APP" --network "$NET" --memory 1536m \
+              -v "$MIG":/migrations:ro \
+              -e SPRING_FLYWAY_LOCATIONS=filesystem:/migrations \
+              -e SPRING_DATASOURCE_URL="jdbc:postgresql://$DB:5432/agritech" \
+              -e SPRING_DATASOURCE_USERNAME=postgres -e SPRING_DATASOURCE_PASSWORD=rehearsal \
+              -e APP_JWT_SECRET="rehearsal-only-$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')" \
+              -e DOCUMENT_SERVICE_URL=http://document-service:8003 \
+              "ghcr.io/mastermind1632/agritech-api:$TAG" >/dev/null
+            result='did not finish starting within 4 minutes'
+            for i in $(seq 1 120); do
+              if docker logs "$APP" 2>&1 | grep -q 'Started AgriFinanceApIsApplication'; then result='STARTED SUCCESSFULLY'; break; fi
+              if [ "$(docker inspect -f '{{.State.Running}}' "$APP")" != true ]; then result='STOPPED DURING START-UP'; break; fi
+              sleep 2
+            done
+            echo "===== REHEARSAL RESULT: the backend $result"
+
+            echo '===== 4. Key lines from the backend log'
+            docker logs "$APP" 2>&1 | grep -nE 'ERROR|Caused by|Flyway|Migrat|migrat|validat|Schema|not part of|FATAL|Exception|Started' | head -80 || true
+            echo '===== Last 60 lines of the backend log'
+            docker logs --tail 60 "$APP" 2>&1 || true
+            echo '===== Upgrades recorded on the COPY after the rehearsal'
+            docker exec "$DB" psql -U postgres -d agritech -c \
+              "select installed_rank, version, description, success from flyway_schema_history order by installed_rank" || true
+            echo '===== Done. Temporary database and backend are being removed; the live site was not touched.'
