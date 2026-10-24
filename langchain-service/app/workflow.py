@@ -133,7 +133,7 @@ class Backend:
 
 
 class Workflow:
-    def __init__(self, database, model_factory, backend=None, telemetry=None):
+    def __init__(self, database, model_factory, backend=None, telemetry=None, model_name='Qwen'):
         path = Path(database)
         path.parent.mkdir(parents=True, exist_ok=True)
         self.connection = sqlite3.connect(str(path), check_same_thread=False, timeout=30)
@@ -154,6 +154,7 @@ class Workflow:
         self.rates = defaultdict(deque)
         self.model_slots = BoundedSemaphore(2)
         self.model_factory = model_factory
+        self.model_name = model_name
         self.backend = backend
         self.telemetry = telemetry or Telemetry()
         self.checkpoint_connection = sqlite3.connect(str(path), check_same_thread=False, timeout=30)
@@ -303,7 +304,7 @@ class Workflow:
             owner = self.connection.execute("SELECT owner FROM farm_threads WHERE id=?", (thread,)).fetchone()[0]
         pending = self.get(owner, thread)["approval"]
         generated_advice = (state.get('advice') or {}).get('status') == 'generated'
-        return {"conversationId": thread, "model": "Qwen" if generated_advice else "AgriTech" if pending or state.get("proposal") or state.get("catalogue_answer") or state.get("route") == "policy" else "Qwen",
+        return {"conversationId": thread, "model": self.model_name if generated_advice else "AgriTech" if pending or state.get("proposal") or state.get("catalogue_answer") or state.get("route") == "policy" else self.model_name,
             "response": state.get("answer") or "Please review this group-order proposal before continuing.",
             "sources": [{k: v for k, v in s.items() if k != "content"} for s in state.get("sources", [])],
             "approval": pending, "actionReady": state.get("action_ready"), "route": state.get("route"), 'advice': state.get('advice')}
@@ -484,6 +485,6 @@ class Workflow:
         citations = [{k:v for k,v in s.items() if k != "content"} for s in state.get("sources", [])]
         return {"messages": [{"role": "user", "text": state["question"]},
             {"role": "assistant", "text": state["answer"], "sources": citations,
-             'model': ('Qwen' if state['advice']['status'] == 'generated' else 'AgriTech') if state.get('advice')
-                      else 'AgriTech' if state.get('catalogue_answer') or state.get('proposal') or state.get('route') == 'policy' else 'Qwen',
+             'model': (self.model_name if state['advice']['status'] == 'generated' else 'AgriTech') if state.get('advice')
+                      else 'AgriTech' if state.get('catalogue_answer') or state.get('proposal') or state.get('route') == 'policy' else self.model_name,
              **({'advice': state['advice']} if state.get('advice') else {})}], "status": "complete"}

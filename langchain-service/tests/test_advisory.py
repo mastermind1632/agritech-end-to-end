@@ -162,7 +162,9 @@ class RecommendationAdviceTests(unittest.TestCase):
         with patch('app.main._engine', self.workflow):
             saved = TestClient(app).get('/api/conversations/' + self.thread,
                                        headers={'Authorization': 'Bearer private-token'}).json()
-        self.assertEqual(saved['messages'][-1]['model'], MODEL)
+        self.assertEqual(saved['messages'][-1]['model'], 'Qwen')
+        self.workflow.model_name = 'later-configured-model'
+        self.assertEqual(self.workflow.get('owner', self.thread)['messages'][-1]['model'], 'Qwen')
 
     def test_ledger_turn_after_advice_does_not_reuse_model_metadata_or_call_model(self):
         self.ask()

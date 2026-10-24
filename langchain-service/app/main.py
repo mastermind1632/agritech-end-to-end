@@ -72,7 +72,7 @@ def engine():
     with _engine_lock:
         if _engine is None:
             database = os.environ.get("AI_CHECKPOINT_DB", str(Path.home() / ".local/share/agritech/checkpoints.sqlite"))
-            _engine = Workflow(database, model_factory, Backend(os.environ.get("AI_BACKEND_URL", "http://localhost:8080")))
+            _engine = Workflow(database, model_factory, Backend(os.environ.get("AI_BACKEND_URL", "http://localhost:8080")), model_name=MODEL)
     return _engine
 
 
@@ -120,9 +120,6 @@ def create(authorization: str = Header(default="")):
 def get(conversation_id: UUID, authorization: str = Header(default="")):
     workflow = engine()
     result = protected(lambda: workflow.get(workflow.backend.identity(authorization), str(conversation_id)))
-    for message in result['messages']:
-        if message.get('model') == 'Qwen':
-            message['model'] = MODEL
     return result
 
 
