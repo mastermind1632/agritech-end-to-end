@@ -19,11 +19,15 @@ public class FarmKnowledgeService {
             new Snippet("guide:analytics", "Farmer clusters, nearest matches and anomalies", "K-means clustering groups farmers by spending, orders and product behaviour. Nearest matching finds similar farmer profiles; similarity is not a credit score or proof of eligibility. Anomalies flag unusual spending or order signals for review, not confirmed fraud. Actual analytics results are needed to establish cluster membership."),
             new Snippet("guide:produce", "Produce markets and buyers", "Produce Markets matches recorded buyer requests to the farmer's production profile using crop, harvest month, delivery radius and capacity. Production profiles contain farm size, crop, province, district, private coordinates, planting and harvest months, capacity and consent settings. No matching request means no buyer opportunity is currently recorded. Listings and Demand insights show recorded produce supply and demand, not confirmed sales. Marketplace and Group Orders cover farm inputs such as seeds, not harvest buyer requests."));
 
-    // PostgreSQL full-text search supplies stemming and stop-word removal, including seed/seeds.
+    // Tokenize conversational filler with the same configuration so show/shows/showing cannot
+    // retrieve a farming document without a matching subject. Already-stemmed query lexemes use
+    // the simple parser to avoid stemming them twice (for example, fertilis -> fertili).
     private static final String SEARCH = """
             WITH search AS (
-                SELECT to_tsquery('english', coalesce(string_agg(quote_literal(term), ' | '), '')) AS query
+                SELECT to_tsquery('simple', coalesce(string_agg(quote_literal(term), ' | '), '')) AS query
                 FROM unnest(tsvector_to_array(to_tsvector('english', ?))) AS terms(term)
+                WHERE term <> ALL(tsvector_to_array(to_tsvector('english',
+                    'ask check create describe explain find get give help information know look make need please provide say show suggest tell use want write advice')))
             ), documents(id, title, content) AS (%s), indexed AS (
                 SELECT *, to_tsvector('english', %s) AS terms FROM documents
             )

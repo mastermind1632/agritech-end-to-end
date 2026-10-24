@@ -65,7 +65,22 @@ class ChatTests(unittest.TestCase):
         with patch("app.main.Client") as runtime:
             result = self.client.get("/health")
             self.assertEqual(result.json()["framework"], "langgraph")
-            runtime.return_value.list.assert_called_once()
+            runtime.return_value.show.assert_called_once_with(MODEL)
+            runtime.return_value.generate.assert_not_called()
+
+    def test_health_is_unavailable_when_the_configured_model_is_missing(self):
+        with patch("app.main.Client") as runtime:
+            runtime.return_value.show.side_effect = ResponseError("model not found", 404)
+            response = self.client.get("/health")
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["detail"], "Configured Ollama model is unavailable")
+
+    def test_health_is_unavailable_when_ollama_cannot_be_reached(self):
+        with patch("app.main.Client") as runtime:
+            runtime.return_value.show.side_effect = ConnectionError("offline")
+            response = self.client.get("/health")
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["detail"], "Ollama is unavailable")
 
 
 if __name__ == "__main__":

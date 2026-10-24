@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestClient;
@@ -52,9 +53,11 @@ public class MarketIntelligenceController {
     }
 
     @PostMapping("/{action:records|feedback}")
-    public Object create(@PathVariable String action, @RequestBody Map<String, Object> body,
+    public ResponseEntity<Object> create(@PathVariable String action, @RequestBody Map<String, Object> body,
             @RequestHeader(HttpHeaders.AUTHORIZATION) String bearer) {
-        return proxy(() -> gateway.post().uri("/api/" + action).header(HttpHeaders.AUTHORIZATION, bearer).body(body).retrieve().body(Object.class));
+        var result = proxy(() -> gateway.post().uri("/api/" + action).header(HttpHeaders.AUTHORIZATION, bearer)
+                .body(body).retrieve().toEntity(Object.class));
+        return ResponseEntity.status(result.getStatusCode()).body(result.getBody());
     }
 
     @DeleteMapping("/records/{id}")
@@ -62,7 +65,7 @@ public class MarketIntelligenceController {
         return proxy(() -> gateway.delete().uri("/api/records/" + id).header(HttpHeaders.AUTHORIZATION, bearer).retrieve().body(Object.class));
     }
 
-    private Object proxy(java.util.function.Supplier<Object> call) {
+    private <T> T proxy(java.util.function.Supplier<T> call) {
         try { return call.get(); }
         catch (RestClientResponseException e) {
             int status = e.getStatusCode().value();

@@ -37,6 +37,43 @@ class FarmerAnalyticsServiceTest {
     }
 
     @Test
+    void identicalProfilesProduceOnePopulatedCluster() {
+        when(gateway.farmerProfiles()).thenReturn(List.of(
+                profile("first", "100", 2), profile("second", "100", 2), profile("third", "100", 2)));
+
+        var response = service.clusters(3);
+
+        assertThat(response.requestedClusters()).isEqualTo(3);
+        assertThat(response.actualClusters()).isEqualTo(1);
+        assertThat(response.clusters()).hasSize(1);
+        assertThat(response.clusters().getFirst().farmers()).hasSize(3)
+                .allSatisfy(member -> assertThat(member.distanceToCentroid()).isZero());
+    }
+
+    @Test
+    void separatesDistinctBehaviourWhenInitialRowsHaveDuplicateFeatures() {
+        when(gateway.farmerProfiles()).thenReturn(List.of(
+                profile("low-1", "100", 2), profile("low-2", "100", 2),
+                profile("high-1", "1000", 20), profile("high-2", "1000", 20),
+                profile("low-3", "100", 2)));
+
+        var response = service.clusters(2);
+
+        assertThat(response.actualClusters()).isEqualTo(2);
+        assertThat(response.clusters()).allSatisfy(cluster -> {
+            assertThat(cluster.farmers()).isNotEmpty();
+            var amounts = cluster.farmers().stream().map(member -> member.farmer().totalExpense()).distinct().toList();
+            assertThat(amounts).hasSize(1);
+            assertThat(cluster.centroid().totalExpense()).isEqualByComparingTo(amounts.getFirst());
+        });
+        assertThat(response.clusters()).flatExtracting(cluster -> cluster.farmers()).hasSize(5);
+    }
+
+    private FarmerProfile profile(String id, String expense, long count) {
+        return new FarmerProfile(id, id, "Limpopo", bd(expense), count, 0, bd("0"), count, Set.of("maize"));
+    }
+
+    @Test
     void ranksNearestFarmersBySimilaritySignals() {
         when(gateway.farmerExists("farmer-1")).thenReturn(true);
         when(gateway.farmerProfiles()).thenReturn(sampleFarmers());

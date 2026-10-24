@@ -39,10 +39,11 @@ Demo: set `APP_DEMO_SEED=true` in `.env`, start with Docker, and sign in as `071
 
 1. Copy `.env.example` to `.env`.
 2. Replace the database password and JWT secret (the defaults are for local use only).
-3. From the project root:
+3. From the project root, start the full local stack, including AI Insights chat,
+   Produce Markets segmentation and the analytics worker:
 
 ```bash
-docker compose up --build
+docker compose -f docker-compose.yml -f docker-compose.ai.yml -f docker-compose.segmentation.yml up -d --build
 ```
 
 Open:
@@ -52,6 +53,22 @@ Open:
 - API health: `http://localhost:8080/actuator/health`
 
 The frontend container reverse-proxies `/api` to the Spring Boot service, so the browser does not need to know the internal Docker hostname.
+
+The addresses above use the default ports. On the current development machine,
+ports 3000 and 5432 are occupied, so its `.env` uses `FRONTEND_PORT=3001` and
+`POSTGRES_PORT=15432`; open `http://localhost:3001` there. These are local overrides,
+not project defaults. Docker services still reach PostgreSQL internally on port 5432.
+
+AI Insights chat requires LangChain, Ollama and the configured Qwen model. The first
+start downloads the model; wait for `langchain-service` to become healthy, then use
+**Retry conversation** if the page was opened while services were starting.
+Include all three Compose files when updating the full stack.
+
+For the base finance, supplier and group-order app only, the smaller startup command is:
+
+```bash
+docker compose up --build
+```
 
 ## Optional Qwen AI Services
 
@@ -68,19 +85,23 @@ This branch copies the AI implementation from `kgodisoLeonard/AgritechSystemApp`
 without changing that project. The two apps keep separate databases, sessions,
 and deployments. No farmer data or secrets were migrated.
 
+For the base app plus AI Insights chat, without the Produce Markets segmentation service:
+
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.ai.yml up -d --build
 ```
 
-Open the existing **AI buying insights** navigation item. It now includes farming
+Use the combined command under **Run with Docker** when both features are needed.
+Open the **AI Insights** navigation item. It includes farming
 questions, source titles, buying comparisons, spending alerts, and the original
 rule-based recommendations. The model defaults to `qwen2.5:0.5b`; the first run
 downloads it. Set `AI_MODEL` to use another installed Ollama model. LangChain
 and Ollama are internal Docker services, not public browser endpoints.
 
-To run alongside the original project's Node API on port 3000, set
-`FRONTEND_PORT=3001` in this repository's `.env` and open `http://localhost:3001`.
-`API_PORT` and `POSTGRES_PORT` can also be changed if those ports are occupied.
+To run alongside another app on port 3000, choose an available `FRONTEND_PORT`
+in this repository's `.env` and open the corresponding localhost address.
+`API_PORT` and `POSTGRES_PORT` can also be changed if those ports are occupied;
+the current machine's overrides are shown above.
 This does not change ports, containers, or database volumes in the original app.
 
 For an IDE backend, run Ollama on port 11434 and the Python adapter on port 8001
@@ -194,6 +215,7 @@ Open `http://localhost:5173`. The dev server proxies `/api` to `http://localhost
 | `database "agritech" does not exist` | Create it (`CREATE DATABASE agritech;`). |
 | `Port 8080 was already in use` | Stop the other process or set `SERVER_PORT=8081` (and `VITE_PROXY_TARGET=http://localhost:8081`). |
 | Browser shows "Cannot reach the server" | Backend is not running on 8080. |
+| AI Insights shows "The farming workflow is unavailable" | Start the combined stack above, including `docker-compose.ai.yml`. AI Insights chat needs LangChain/Ollama even when Produce Markets segmentation is already running. Wait for model readiness, then use **Retry conversation**. |
 | Signed out unexpectedly | Tokens last 24 h (`APP_JWT_EXPIRATION_SECONDS`); the app returns you to sign-in when one expires. Changing `APP_JWT_SECRET` also invalidates old tokens. |
 
 ## Main API surface
@@ -298,3 +320,5 @@ observation imports. It is separate from the Qwen chatbot.
 
 See [Floyd's implementation and operations guide](docs/FLOYD_SEGMENTATION.md) for scope,
 test commands, deployment, model review and data-dependent work that still requires real data.
+The [Floyd task checklist](docs/FLOYD_TASKS_STATUS.md) maps the platform guide's requirements
+to the implementation and records the real local backend/frontend verification.

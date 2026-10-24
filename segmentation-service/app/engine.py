@@ -2,7 +2,9 @@ import hashlib
 from calendar import month_name
 import math
 from collections import Counter, defaultdict
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
+
+from app.forecasting import forecast_months
 
 RULE_VERSION = "rules-v1"
 EXPORT_CROPS = {"citrus", "apple", "grape", "avocado"}
@@ -70,14 +72,15 @@ def matches(profile, records, owner, today=None, arm="control", exposure=None, l
     return selected
 
 
-def demand_summary(records, searches, prices, today=None):
+def demand_summary(records, searches, prices, today=None, order_outcomes=None):
     today = today or date.today()
     groups = defaultdict(lambda: {"buyerRequests": 0, "requestedKg": 0, "offers": 0,
-                                   "failedSearches": 0, "priceTotal": 0, "priceVolume": 0, "sources": set()})
+                                   "failedSearches": 0, "completedOrders": 0, "completedQuantityKg": 0,
+                                   "recordedOrderValueZar": 0, "priceTotal": 0, "priceVolume": 0, "sources": set()})
     for r in records:
         if date.fromisoformat(r["availableUntil"]) < today:
             continue
-        row = groups[(r["crop"], r["province"], int(r["availableFrom"][5:7]))]
+        row = groups[(r["crop"], r["province"], r["availableFrom"][:7])]
         if r["kind"] == "demand":
             row["buyerRequests"] += 1
             row["requestedKg"] += r["quantityKg"]
@@ -85,18 +88,32 @@ def demand_summary(records, searches, prices, today=None):
             row["offers"] += 1
     for s in searches:
         if s["resultCount"] == 0 and s.get("kind", "offer") == "offer":
-            groups[(s["crop"], s["province"], int(s["occurredOn"][5:7]))]["failedSearches"] += 1
+            groups[(s["crop"], s["province"], s["occurredOn"][:7])]["failedSearches"] += 1
     for p in prices:
-        row = groups[(p["crop"], p["province"], int(p["observedOn"][5:7]))]
+        row = groups[(p["crop"], p["province"], p["observedOn"][:7])]
         row["priceTotal"] += p["pricePerKg"] * p["volumeKg"]
         row["priceVolume"] += p["volumeKg"]
         row["sources"].add(p["sourceUrl"])
-    return [{"crop": crop, "province": province, "month": month,
-             **{k: v for k, v in row.items() if k not in ("priceTotal", "priceVolume", "sources")},
+    for event in order_outcomes or []:
+        if event.get("status") != "completed":
+            continue
+        # Reporting follows South African calendar months even for UTC events.
+        occurred = datetime.fromisoformat(event["occurredAt"].replace("Z", "+00:00")).astimezone(timezone(timedelta(hours=2))).date()
+        if occurred > today:
+            continue
+        row = groups[(event["crop"], event["province"], occurred.isoformat()[:7])]
+        row["completedOrders"] += 1
+        row["completedQuantityKg"] += event["quantityKg"]
+        row["recordedOrderValueZar"] += event["quantityKg"] * event["pricePerKg"]
+    return [{"crop": crop, "province": province, "month": int(period[5:7]), "year": int(period[:4]), "yearMonth": period,
+             **{k: v for k, v in row.items() if k not in ("priceTotal", "priceVolume", "sources", "recordedOrderValueZar")},
+             "recordedOrderValueZar": round(row["recordedOrderValueZar"], 2),
              "observedPricePerKg": round(row["priceTotal"] / row["priceVolume"], 2) if row["priceVolume"] else None,
              "priceSources": sorted(row["sources"]), "priceBasis": "Volume-weighted historical market observations, not a current quote",
+             "requestBasis": "Open published requests grouped by start month; requested volume is not an order or sale",
+             "completedOrderBasis": "Trusted recorded completed produce orders, grouped by South African completion month",
              "profitability": "Unknown: production, delivery and selling costs are not supplied"}
-            for (crop, province, month), row in sorted(groups.items())]
+            for (crop, province, period), row in sorted(groups.items())]
 
 
 def feature_rows(profiles):
@@ -117,29 +134,11 @@ def cohort_fingerprint(profiles):
     return hashlib.sha256(json.dumps(rows, sort_keys=True).encode()).hexdigest()
 
 
-def forecast_months(observations, horizon=3):
-    import pandas as pd
-    from statsmodels.tsa.holtwinters import ExponentialSmoothing
-    if not observations:
-        return {"method": "insufficient_history", "forecast": []}
-    series = pd.Series({pd.Timestamp(row["month"]): row["quantityKg"] for row in observations}).sort_index()
-    # Missing months are unknown, not zero demand. Two complete annual cycles are needed for seasonality.
-    complete = series.reindex(pd.date_range(series.index.min(), series.index.max(), freq="MS"))
-    if len(complete) < 24 or complete.isna().any():
-        return {"method": "seasonal_averages", "forecast": [],
-                "averages": {str(m): float(v) for m, v in series.groupby(series.index.month).mean().items()},
-                "notice": "Forecast withheld until 24 consecutive observed months are available"}
-    fit = ExponentialSmoothing(complete, trend="add", seasonal="add", seasonal_periods=12).fit()
-    return {"method": "holt_winters", "forecast": [
-        {"month": t.date().isoformat(), "quantityKg": max(0, round(float(v), 2))}
-        for t, v in fit.forecast(horizon).items()], "notice": "Experimental forecast, not guaranteed buyer demand"}
-
-
-def market_forecasts(prices):
+def market_forecasts(prices, today=None):
     groups = defaultdict(lambda: defaultdict(float))
     for row in prices:
         groups[(row["crop"], row["province"], row["market"])][row["observedOn"][:7] + "-01"] += row["volumeKg"]
     return [{"crop": crop, "province": province, "market": market,
-             **forecast_months([{"month": month, "quantityKg": qty} for month, qty in sorted(months.items())]),
+             **forecast_months([{"month": month, "quantityKg": qty} for month, qty in sorted(months.items())], today=today),
              "basis": "Imported observed market volume, not total regional demand; collection coverage must be reviewed"}
             for (crop, province, market), months in sorted(groups.items())]

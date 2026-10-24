@@ -91,7 +91,10 @@ def protected(call):
 @app.get("/health")
 def health():
     try:
-        Client(host=OLLAMA_URL, timeout=5).list()
+        # A reachable daemon can still lack the model needed to answer requests.
+        Client(host=OLLAMA_URL, timeout=5).show(MODEL)
+    except ResponseError as exc:
+        raise HTTPException(status_code=503, detail="Configured Ollama model is unavailable") from exc
     except Exception as exc:
         raise HTTPException(status_code=503, detail="Ollama is unavailable") from exc
     return {"status": "ok", "framework": "langgraph", "model": MODEL,

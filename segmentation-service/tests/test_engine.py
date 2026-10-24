@@ -2,7 +2,7 @@ import math
 import unittest
 from datetime import date
 
-from app.engine import cohort_fingerprint, demand_summary, distance_km, experiment_arm, feature_rows, forecast_months, matches, services
+from app.engine import cohort_fingerprint, demand_summary, distance_km, experiment_arm, feature_rows, forecast_months, market_forecasts, matches, services
 from app.models import FarmProfile, MarketRecord
 
 
@@ -79,8 +79,61 @@ class EngineTest(unittest.TestCase):
         self.assertEqual(forecast_months([])["method"], "insufficient_history")
         self.assertEqual(forecast_months([{"month": "2025-01-01", "quantityKg": 100}])["method"], "seasonal_averages")
         observations = [{"month": f"{year}-{month:02}-01", "quantityKg": 100 + month * 10} for year in (2024, 2025) for month in range(1, 13)]
-        self.assertEqual(len(forecast_months(observations)["forecast"]), 3)
-        self.assertEqual(forecast_months(observations[:-2])["method"], "seasonal_averages")
+        current = date(2026, 1, 15)
+        self.assertEqual(len(forecast_months(observations, today=current)["forecast"]), 3)
+        self.assertEqual(forecast_months(observations[:-2], today=current)["method"], "seasonal_averages")
+        with_gap = [row for row in observations if row["month"] != "2024-06-01"]
+        self.assertEqual(forecast_months(with_gap, today=current)["forecast"], [])
+
+    def test_forecast_excludes_incomplete_current_month_and_future_data(self):
+        observations = [{"month": f"{year}-{month:02}-01", "quantityKg": 100 + month * 10}
+                        for year in (2024, 2025) for month in range(1, 13)]
+        current = date(2026, 1, 15)
+        expected = forecast_months(observations, today=current)
+        self.assertEqual(expected["method"], "seasonal_naive")
+        self.assertEqual(expected["validation"]["status"], "not_backtested")
+        self.assertEqual(expected["forecast"][0]["month"], "2026-01-01")
+        for extra in ("2026-01-01", "2026-02-01"):
+            self.assertEqual(forecast_months([*observations, {"month": extra, "quantityKg": 999999}], today=current), expected)
+        self.assertEqual(forecast_months([{"month": "2026-01-01", "quantityKg": 100}], today=current)["method"], "insufficient_history")
+
+    def test_market_forecast_withholds_stale_history_instead_of_forecasting_past_months(self):
+        prices = [{"crop": "tomato", "province": "Limpopo", "market": "Test market",
+                   "observedOn": f"{year}-{month:02}-01", "volumeKg": 100 + month * 10}
+                  for year in (2024, 2025) for month in range(1, 13)]
+        result = market_forecasts(prices, today=date(2026, 10, 19))[0]
+        self.assertEqual(result["method"], "seasonal_averages")
+        self.assertEqual(result["forecast"], [])
+        self.assertIn("previous month", result["notice"])
+
+    def test_demand_history_keeps_the_year_instead_of_pooling_same_month(self):
+        prices = [{"crop": "tomato", "province": "Limpopo", "observedOn": f"{year}-10-01",
+                   "pricePerKg": price, "volumeKg": 100, "sourceUrl": "https://example.org/market"}
+                  for year, price in ((2025, 10), (2026, 20))]
+        rows = demand_summary([], [], prices, date(2026, 10, 19))
+        self.assertEqual([(r["yearMonth"], r["year"], r["month"], r["observedPricePerKg"]) for r in rows],
+                         [("2025-10", 2025, 10, 10), ("2026-10", 2026, 10, 20)])
+
+    def test_completed_produce_orders_are_distinct_from_open_requests_and_searches(self):
+        outcomes = [{"status": status, "crop": "tomato", "province": "Limpopo",
+                     "quantityKg": 200, "pricePerKg": 10.25, "occurredAt": timestamp}
+                    for status, timestamp in (("completed", "2026-10-10T10:00:00+02:00"),
+                                              ("cancelled", "2026-10-11T10:00:00+02:00"),
+                                              ("completed", "2026-11-10T10:00:00+02:00"))]
+        row = demand_summary([record()], [], [], date(2026, 10, 19), order_outcomes=outcomes)[0]
+        self.assertEqual(row["completedOrders"], 1)
+        self.assertEqual(row["completedQuantityKg"], 200)
+        self.assertEqual(row["recordedOrderValueZar"], 2050)
+        self.assertEqual(row["buyerRequests"], 1)
+        self.assertEqual(row["requestedKg"], 500)
+        self.assertEqual(row["failedSearches"], 0)
+
+    def test_completed_order_calendar_month_uses_south_african_time_and_year(self):
+        event = {"status": "completed", "crop": "tomato", "province": "Limpopo", "quantityKg": 1,
+                 "pricePerKg": 10, "occurredAt": "2025-12-31T23:30:00Z"}
+        row = demand_summary([], [], [], date(2026, 1, 1), order_outcomes=[event])[0]
+        self.assertEqual((row["yearMonth"], row["month"], row["year"]), ("2026-01", 1, 2026))
+        self.assertEqual(row["buyerRequests"], 0)
 
     def test_profile_validation_rejects_invalid_coordinates_unknown_fields_and_nan(self):
         base = {k: v for k, v in profile().items() if k != "ownerId"}

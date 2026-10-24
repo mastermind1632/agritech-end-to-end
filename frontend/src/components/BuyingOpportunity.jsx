@@ -13,11 +13,14 @@ const rand = value => {
 export default function BuyingOpportunity({ item, reviewOrder, requestReview, reviewDisabled }) {
   const { t } = useLang();
   const [opportunity, setOpportunity] = useState(item);
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState(item.quote.quantity);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const sequence = useRef(0);
-  useEffect(() => { sequence.current++; setOpportunity(item); setQuantity(item.quote.quantity); setError(''); }, [item]);
+  useEffect(() => {
+    sequence.current++; setOpportunity(item); setQuantity(item.quote.quantity); setBusy(false); setError('');
+    return () => { sequence.current++; };
+  }, [item]);
   const quote = opportunity.quote;
   const changed = Number(quantity) !== quote.quantity;
   const check = async event => {

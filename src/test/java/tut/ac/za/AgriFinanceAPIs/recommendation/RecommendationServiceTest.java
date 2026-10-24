@@ -91,4 +91,39 @@ class RecommendationServiceTest {
         controller.quote("order",2,authentication);
         verify(service).quote("own","order",2);
     }
+
+    @Test void quotesAvailableOrdersOutsideTheTopTenRecommendations() {
+        var farmers = mock(FarmerRepository.class); var expenses = mock(ExpenseRepository.class);
+        var products = mock(SupplierProductRepository.class); var orders = mock(GroupOrderRepository.class);
+        var items = mock(GroupOrderItemRepository.class); var recs = mock(AiRecommendationRepository.class);
+        when(farmers.existsById("own")).thenReturn(true);
+        var available = java.util.stream.IntStream.range(0, 11).mapToObj(index -> {
+            var order = order(); order.setId(String.format("order-%02d", index)); return order;
+        }).toList();
+        when(orders.findAllByStatusOrderByCreatedAtDesc("open")).thenReturn(available);
+        when(orders.findById("order-10")).thenReturn(java.util.Optional.of(available.getLast()));
+        when(products.findById("maize")).thenReturn(java.util.Optional.of(product()));
+        var service = new RecommendationService(recs, farmers, expenses, products, orders, items);
+
+        assertThat(service.generate("own")).hasSize(10)
+                .noneSatisfy(opportunity -> assertThat(opportunity.id()).isEqualTo("order-10"));
+        assertThat(service.quote("own", "order-10", 2).quote().quantity()).isEqualTo(2);
+    }
+
+    @Test void quoteRejectsClosedOrdersAndPreviousParticipants() {
+        var farmers = mock(FarmerRepository.class); var expenses = mock(ExpenseRepository.class);
+        var products = mock(SupplierProductRepository.class); var orders = mock(GroupOrderRepository.class);
+        var items = mock(GroupOrderItemRepository.class);
+        when(farmers.existsById("own")).thenReturn(true);
+        var order = order(); order.setStatus("closed");
+        when(orders.findById("order")).thenReturn(java.util.Optional.of(order));
+        var service = new RecommendationService(mock(AiRecommendationRepository.class), farmers, expenses, products, orders, items);
+
+        assertThatThrownBy(() -> service.quote("own", "order", 1))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        order.setStatus("open");
+        when(items.existsByGroupOrderIdAndFarmerId("order", "own")).thenReturn(true);
+        assertThatThrownBy(() -> service.quote("own", "order", 1))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+    }
 }
