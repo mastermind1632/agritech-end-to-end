@@ -47,6 +47,37 @@ public class ExportWorkflow {
     @Column(length = 1000)
     private String lessons;
 
+        // --- SOP Specific Fields (Agricultural Product Standards Act) ---
+    @Column(name = "fbo_code", length = 50)
+    private String fboCode;
+
+    @Column(name = "variety", length = 100)
+    private String variety;
+
+    @Column(name = "class_category", length = 100)
+    private String classCategory;
+
+    @Column(name = "package_count")
+    private Integer packageCount;
+
+    @Column(name = "package_type", length = 50)
+    private String packageType; // e.g., cartons, bags, pallets
+
+    @Column(name = "pallet_count")
+    private Integer palletCount;
+
+    @Column(name = "container_number", length = 50)
+    private String containerNumber;
+
+    @Column(name = "transport_mode", length = 20)
+    private String transportMode; // SEA, AIR, LAND
+
+    @Column(name = "inspection_date")
+    private LocalDate inspectionDate;
+
+    @Column(name = "certificate_valid_until")
+    private LocalDate certificateValidUntil;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -88,8 +119,30 @@ public class ExportWorkflow {
     public void setOutcome(String outcome) { this.outcome = outcome; }
     public String getLessons() { return lessons; }
     public void setLessons(String lessons) { this.lessons = lessons; }
+        public String getFboCode() { return fboCode; }
+    public void setFboCode(String fboCode) { this.fboCode = fboCode; }
+    public String getVariety() { return variety; }
+    public void setVariety(String variety) { this.variety = variety; }
+    public String getClassCategory() { return classCategory; }
+    public void setClassCategory(String classCategory) { this.classCategory = classCategory; }
+    public Integer getPackageCount() { return packageCount; }
+    public void setPackageCount(Integer packageCount) { this.packageCount = packageCount; }
+    public String getPackageType() { return packageType; }
+    public void setPackageType(String packageType) { this.packageType = packageType; }
+    public Integer getPalletCount() { return palletCount; }
+    public void setPalletCount(Integer palletCount) { this.palletCount = palletCount; }
+    public String getContainerNumber() { return containerNumber; }
+    public void setContainerNumber(String containerNumber) { this.containerNumber = containerNumber; }
+    public String getTransportMode() { return transportMode; }
+    public void setTransportMode(String transportMode) { this.transportMode = transportMode; }
+    public LocalDate getInspectionDate() { return inspectionDate; }
+    public void setInspectionDate(LocalDate inspectionDate) { this.inspectionDate = inspectionDate; }
+    public LocalDate getCertificateValidUntil() { return certificateValidUntil; }
+    public void setCertificateValidUntil(LocalDate certificateValidUntil) { this.certificateValidUntil = certificateValidUntil; }
+
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public LocalDateTime getClosedAt() { return closedAt; }
     public void setClosedAt(LocalDateTime closedAt) { this.closedAt = closedAt; }
 }
+

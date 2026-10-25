@@ -110,7 +110,8 @@ public class DemoDataSeeder implements ApplicationRunner {
         companion.saveCropPlan(thandi.getId(), null, new CompanionDtos.CropPlanRequest("Avocados", new BigDecimal("5"),
                 new BigDecimal("9000"), "kg", new BigDecimal("22.00"), new BigDecimal("60000"), 7, 5));
         exports.start(thandi.getId(), new ExportDtos.StartWorkflow("AVOCADO", "EU", LocalDate.now().plusMonths(7),
-                new BigDecimal("20"), "tonne"));
+                new BigDecimal("20"), "tonne",
+                null, null, null, null, null, null, null, null));
 
         listing(thandi, "Tomatoes", "Vegetables", "Class 1", "crate", "120.00", "80", "Tzaneen, Limpopo", -23.83, 30.16);
         listing(thandi, "Butternut", "Vegetables", "Class 1", "kg", "7.50", "1500", "Tzaneen, Limpopo", -23.83, 30.16);
@@ -217,3 +218,4 @@ public class DemoDataSeeder implements ApplicationRunner {
         return products.save(p);
     }
 }
+

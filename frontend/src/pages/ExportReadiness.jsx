@@ -29,10 +29,10 @@ function ItemRow({ item, docs, onUpdate, readOnly }) {
   return (
     <div className={`req-row ${item.status.toLowerCase()}`}>
       <button className="req-head" onClick={() => setOpen(!open)} aria-expanded={open}>
-        <span className={`step-check ${item.status === 'DONE' ? 'on' : ''}`}>{item.status === 'DONE' ? '✓' : ''}</span>
+        <span className={`step-check ${item.status === 'DONE' ? 'on' : ''}`}>{item.status === 'DONE' ? '???' : ''}</span>
         <div>
           <b>{t(r.title)}</b>
-          <span>{t(r.authorityLabel)}{r.documents ? ` · ${t(r.documents)}` : ''}</span>
+          <span>{t(r.authorityLabel)}{r.documents ? ` ?? ${t(r.documents)}` : ''}</span>
         </div>
         <div className="req-badges">
           {item.changedSinceStarted && <Badge tone="warn" title="This requirement was updated after you started">Updated</Badge>}
@@ -43,9 +43,9 @@ function ItemRow({ item, docs, onUpdate, readOnly }) {
       {open && (
         <div className="req-body">
           <p>{t(r.description)}</p>
-          {item.autoChecked && item.status === 'DONE' && <p className="muted">✓ {t(item.note)}</p>}
+          {item.autoChecked && item.status === 'DONE' && <p className="muted">??? {t(item.note)}</p>}
           <div className="row-wrap">
-            {r.sourceUrl && <a className="secondary btn-link" href={r.sourceUrl} target="_blank" rel="noreferrer">{t('Official source ↗')}</a>}
+            {r.sourceUrl && <a className="secondary btn-link" href={r.sourceUrl} target="_blank" rel="noreferrer">{t('Official source ???')}</a>}
             {r.lastVerified && <span className="muted">{t('Checked {date}', { date: date(r.lastVerified) })}</span>}
           </div>
           {!readOnly && (
@@ -100,16 +100,16 @@ function Workflow({ id, onBack, docs }) {
     Object.entries(w.byAuthority).map(([a, items]) => ({
       title: t('{authority} ({pct}% done)', { authority: t(AUTH_INFO[a]?.[0] || a), pct: w.authorityPercent[a] }),
       html: table(['Stage', 'Requirement', 'Documents', 'Status', 'Note'].map(tr), items.map((i) => [i.requirement.stage, t(i.requirement.title), t(i.requirement.documents || ''), t(STATUS_LABEL[i.status]), i.note || '']))
-    })), t('HS code {code} · readiness {pct}%', { code: s.hsCode || '-', pct: s.readiness }));
+    })), t('HS code {code} ?? readiness {pct}%', { code: s.hsCode || '-', pct: s.readiness }));
 
   return (
     <>
-      <button className="link-btn" onClick={onBack}>{t('← All export plans')}</button>
+      <button className="link-btn" onClick={onBack}>{t('??? All export plans')}</button>
       <div className="fm-panel progress-hero" style={{ marginTop: 10 }}>
         <ProgressRing value={s.readiness} size={96} color="var(--gold)" />
         <div style={{ flex: 1 }}>
-          <h3>{t(s.productName)} → {t(s.destinationName)}</h3>
-          <p className="muted">{t('HS code {code}', { code: s.hsCode || '—' })} · {t('Stage {n} of 8: {name}', { n: s.currentStage, name: t(s.currentStageName) })}{s.targetShipDate ? ` · ${t('target ship date {date}', { date: date(s.targetShipDate) })}` : ''}</p>
+          <h3>{t(s.productName)} ??? {t(s.destinationName)}</h3>
+          <p className="muted">{t('HS code {code}', { code: s.hsCode || '???' })} ?? {t('Stage {n} of 8: {name}', { n: s.currentStage, name: t(s.currentStageName) })}{s.targetShipDate ? ` ?? ${t('target ship date {date}', { date: date(s.targetShipDate) })}` : ''}</p>
           <div className="row-wrap" style={{ marginTop: 8 }}>
             {s.exportReady && <Badge tone="good">Export-ready</Badge>}
             <Badge tone={statusTone(s.status)}>{titleCase(s.status)}</Badge>
@@ -118,7 +118,7 @@ function Workflow({ id, onBack, docs }) {
         </div>
         <div className="row-wrap">
           <button className="secondary" onClick={print}>{t('Print / PDF')}</button>
-          {active && <button className="primary" onClick={advance} disabled={!w.canAdvance}>{t('Next stage →')}</button>}
+          {active && <button className="primary" onClick={advance} disabled={!w.canAdvance}>{t('Next stage ???')}</button>}
         </div>
       </div>
       {active && !w.canAdvance && w.blockers.length > 0 && (
@@ -127,7 +127,7 @@ function Workflow({ id, onBack, docs }) {
       <div className="stepper">
         {w.stages.map((st) => (
           <div key={st.stage} className={`stepper-step ${st.current ? 'current' : ''} ${st.complete ? 'complete' : ''}`}>
-            <span>{st.complete ? '✓' : st.stage}</span><small>{t(st.name)}</small>
+            <span>{st.complete ? '???' : st.stage}</span><small>{t(st.name)}</small>
           </div>
         ))}
       </div>
@@ -141,7 +141,7 @@ function Workflow({ id, onBack, docs }) {
         )) : Object.entries(w.byAuthority).map(([a, items]) => (
           <section key={a} className="stage-block">
             <div className="stage-block-head">
-              <div><h3>{t(AUTH_INFO[a]?.[0] || a)}</h3><p className="muted">{t(AUTH_INFO[a]?.[1])} {AUTH_INFO[a]?.[2] && <a href={AUTH_INFO[a][2]} target="_blank" rel="noreferrer">{t('Website ↗')}</a>}</p></div>
+              <div><h3>{t(AUTH_INFO[a]?.[0] || a)}</h3><p className="muted">{t(AUTH_INFO[a]?.[1])} {AUTH_INFO[a]?.[2] && <a href={AUTH_INFO[a][2]} target="_blank" rel="noreferrer">{t('Website ???')}</a>}</p></div>
               <Progress value={w.authorityPercent[a]} />
             </div>
             {items.map((i) => <ItemRow key={i.itemId} item={i} docs={docs} onUpdate={update} readOnly={!active} />)}
@@ -167,7 +167,7 @@ function Workflow({ id, onBack, docs }) {
 function Start({ options, onStarted }) {
   const toast = useToast();
   const { t } = useLang();
-  const [f, setF] = useState({ productCode: '', destinationCode: '', targetShipDate: '', volume: '', volumeUnit: 'tonne' });
+  const [f, setF] = useState({ productCode: '', destinationCode: '', targetShipDate: '', volume: '', volumeUnit: 'tonne', transportMode: 'SEA', fboCode: '', variety: '', classCategory: '', packageCount: '', packageType: 'cartons', palletCount: '', containerNumber: '' });
   const [preview, setPreview] = useState(null);
   useEffect(() => {
     if (!f.productCode || !f.destinationCode) { setPreview(null); return; }
@@ -193,12 +193,28 @@ function Start({ options, onStarted }) {
           <option value="">{t('Choose')}</option>{options.destinations.map((d) => <option key={d.code} value={d.code}>{t(d.name)}</option>)}</select></label>
         <label>{t('Target ship date (optional)')}<input className="filter" type="date" value={f.targetShipDate} onChange={(e) => setF({ ...f, targetShipDate: e.target.value })} /></label>
         <label>{t('Volume (optional)')}<input className="filter" type="number" min="0" step="0.1" value={f.volume} onChange={(e) => setF({ ...f, volume: e.target.value })} /></label>
+        <label>{t('Transport Mode')}<select className="filter" value={f.transportMode} onChange={(e) => setF({ ...f, transportMode: e.target.value })}>
+          <option value="SEA">Sea (40 days validity)</option>
+          <option value="AIR">Air (10 days validity)</option>
+          <option value="LAND">Land (40 days validity)</option>
+        </select></label>
+        <label>{t('FBO / Production Unit Code')}<input className="filter" value={f.fboCode} onChange={(e) => setF({ ...f, fboCode: e.target.value })} placeholder="e.g. FBO12345" /></label>
+        <label>{t('Variety')}<input className="filter" value={f.variety} onChange={(e) => setF({ ...f, variety: e.target.value })} placeholder="e.g. Hass" /></label>
+        <label>{t('Class / Category')}<input className="filter" value={f.classCategory} onChange={(e) => setF({ ...f, classCategory: e.target.value })} placeholder="e.g. Class 1" /></label>
+        <label>{t('Package Type')}<select className="filter" value={f.packageType} onChange={(e) => setF({ ...f, packageType: e.target.value })}>
+          <option value="cartons">Cartons</option>
+          <option value="bags">Bags</option>
+          <option value="pallets">Pallets</option>
+        </select></label>
+        <label>{t('Package Count')}<input type="number" className="filter" value={f.packageCount} onChange={(e) => setF({ ...f, packageCount: e.target.value })} placeholder="e.g. 100" /></label>
+        <label>{t('Pallet Count')}<input type="number" className="filter" value={f.palletCount} onChange={(e) => setF({ ...f, palletCount: e.target.value })} placeholder="e.g. 2" /></label>
+        <label>{t('Container Number')}<input className="filter" value={f.containerNumber} onChange={(e) => setF({ ...f, containerNumber: e.target.value })} placeholder="e.g. MSCU1234567" /></label>
       </div>
       {preview && (
         <div className="preview-grid">
           {Object.entries(preview).map(([a, list]) => (
             <div key={a} className="preview-card"><b>{t(AUTH_INFO[a]?.[0] || a)}</b><span>{t(list.length > 1 ? '{n} requirements' : '{n} requirement', { n: list.length })}</span>
-              <ul>{list.slice(0, 4).map((r) => <li key={r.id}>{t(r.title)}</li>)}{list.length > 4 && <li>{t('…and {n} more', { n: list.length - 4 })}</li>}</ul></div>
+              <ul>{list.slice(0, 4).map((r) => <li key={r.id}>{t(r.title)}</li>)}{list.length > 4 && <li>{t('???and {n} more', { n: list.length - 4 })}</li>}</ul></div>
           ))}
         </div>
       )}
@@ -227,7 +243,7 @@ export default function ExportReadiness() {
     <>
       <div className="page-head">
         <div>
-          <p className="eyebrow">{t('EXPORT READINESS · PPECB')}</p>
+          <p className="eyebrow">{t('EXPORT READINESS ?? PPECB')}</p>
           <h1>{t('From "interested" to "shipment cleared".')}</h1>
           <p className="muted">{t('Every requirement shows the authority it comes from - PPECB, the Department of Agriculture, SARS Customs, the destination country or your buyer - so you know whom to call when a step is blocked.')}</p>
         </div>
@@ -239,7 +255,7 @@ export default function ExportReadiness() {
           : tab === 'who' ? (
             <div className="card-grid">
               {Object.entries(AUTH_INFO).filter(([k]) => k !== 'PLATFORM').map(([k, [name, text, url]]) => (
-                <div key={k} className="panel"><h3>{t(name)}</h3><p className="muted">{t(text)}</p>{url && <a href={url} target="_blank" rel="noreferrer">{url.replace('https://', '')} ↗</a>}</div>
+                <div key={k} className="panel"><h3>{t(name)}</h3><p className="muted">{t(text)}</p>{url && <a href={url} target="_blank" rel="noreferrer">{url.replace('https://', '')} ???</a>}</div>
               ))}
               <div className="panel"><h3>{t('Useful trade tools')}</h3><ul className="link-list">
                 <li><a href="https://www.macmap.org" target="_blank" rel="noreferrer">ITC Market Access Map</a> - {t('tariffs and requirements')}</li>
@@ -251,7 +267,7 @@ export default function ExportReadiness() {
               </ul></div>
             </div>
           ) : !plans ? <SkeletonCards count={2} /> : !plans.length ? (
-            <EmptyState icon="✈" title="No export plans yet" text="Pick a product and a market to see the full list of registrations, inspections and documents you need." action="Start a plan" onAction={() => setTab('new')} />
+            <EmptyState icon="???" title="No export plans yet" text="Pick a product and a market to see the full list of registrations, inspections and documents you need." action="Start a plan" onAction={() => setTab('new')} />
           ) : (
             <div className="card-grid">
               {plans.map((p) => (
@@ -259,7 +275,7 @@ export default function ExportReadiness() {
                   <div className="row-wrap" style={{ justifyContent: 'space-between' }}>
                     <Badge tone={statusTone(p.status)}>{titleCase(p.status)}</Badge>{p.exportReady && <Badge tone="good">Export-ready</Badge>}
                   </div>
-                  <h3>{t(p.productName)} → {t(p.destinationName)}</h3>
+                  <h3>{t(p.productName)} ??? {t(p.destinationName)}</h3>
                   <p className="muted">{t('Stage {n}: {name}', { n: p.currentStage, name: t(p.currentStageName) })}</p>
                   <Progress value={p.readiness} label="Readiness" />
                   {p.changedRequirements > 0 && <p className="warn-text">{t('{n} requirement(s) changed - review', { n: p.changedRequirements })}</p>}
@@ -271,3 +287,4 @@ export default function ExportReadiness() {
     </>
   );
 }
+

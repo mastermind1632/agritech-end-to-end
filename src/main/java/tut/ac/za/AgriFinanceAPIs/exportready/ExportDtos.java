@@ -9,7 +9,23 @@ import java.util.Map;
 public final class ExportDtos {
     private ExportDtos() { }
 
-    public record StartWorkflow(String productCode, String destinationCode, LocalDate targetShipDate, BigDecimal volume, String volumeUnit) { }
+    public record StartWorkflow(
+    String productCode, 
+    String destinationCode, 
+    LocalDate targetShipDate, 
+    BigDecimal volume, 
+    String volumeUnit,
+    
+    // --- SOP Specific Fields ---
+    String fboCode,
+    String variety,
+    String classCategory,
+    Integer packageCount,
+    String packageType,
+    Integer palletCount,
+    String containerNumber,
+    String transportMode // SEA, AIR, LAND
+) { }
 
     public record ItemUpdate(String status, String note, String documentId) { }
 
@@ -45,3 +61,4 @@ public final class ExportDtos {
     public record ChangeView(Long id, Long requirementId, String requirementTitle, String source, String summary,
                              String proposedTitle, String proposedDescription, String status, LocalDateTime createdAt) { }
 }
+

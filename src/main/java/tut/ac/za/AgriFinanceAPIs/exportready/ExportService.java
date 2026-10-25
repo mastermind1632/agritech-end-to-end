@@ -96,6 +96,29 @@ public class ExportService {
         w.setTargetShipDate(req.targetShipDate());
         w.setVolume(req.volume());
         w.setVolumeUnit(req.volumeUnit() == null ? null : req.volumeUnit().trim());
+        
+        // --- SOP SPECIFIC FIELDS ---
+        w.setFboCode(req.fboCode());
+        w.setVariety(req.variety());
+        w.setClassCategory(req.classCategory());
+        w.setPackageCount(req.packageCount());
+        w.setPackageType(req.packageType());
+        w.setPalletCount(req.palletCount());
+        w.setContainerNumber(req.containerNumber());
+        w.setTransportMode(req.transportMode());
+        
+        // SOP Rule: Validity is 40 days by Sea/Land, 10 days by Air
+        if (req.transportMode() != null) {
+            java.time.LocalDate inspectionDate = java.time.LocalDate.now(); // Default to today
+            w.setInspectionDate(inspectionDate);
+            
+            if ("AIR".equalsIgnoreCase(req.transportMode())) {
+                w.setCertificateValidUntil(inspectionDate.plusDays(10));
+            } else if ("SEA".equalsIgnoreCase(req.transportMode()) || "LAND".equalsIgnoreCase(req.transportMode())) {
+                w.setCertificateValidUntil(inspectionDate.plusDays(40));
+            }
+        }
+        
         workflows.save(w);
         for (ExportRequirement r : requirements.forPair(p.getCode(), d.getCode())) {
             ExportWorkflowItem i = new ExportWorkflowItem();
@@ -445,3 +468,4 @@ public class ExportService {
 
     private static ResponseStatusException conflict(String m) { return new ResponseStatusException(HttpStatus.CONFLICT, m); }
 }
+
