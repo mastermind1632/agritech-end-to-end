@@ -6,6 +6,10 @@ from pymongo import MongoClient
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 
+# Explicitly load the .env file from the current directory
+env_path = Path(__file__).parent / '.env'
+load_dotenv(dotenv_path=env_path)
+
 load_dotenv()
 
 # Explicitly define 'app' for ASGI/Uvicorn
