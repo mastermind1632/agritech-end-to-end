@@ -87,3 +87,4 @@ def chat_with_companion(request: ChatRequest):
         "step_number": request.step_number,
         "response": response.content
     }
+
