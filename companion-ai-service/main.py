@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -6,11 +7,9 @@ from pymongo import MongoClient
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 
-# Explicitly load the .env file from the current directory
+# Explicitly load and override environment variables from the local .env file
 env_path = Path(__file__).parent / '.env'
-load_dotenv(dotenv_path=env_path)
-
-load_dotenv()
+load_dotenv(dotenv_path=env_path, override=True)
 
 # Explicitly define 'app' for ASGI/Uvicorn
 app = FastAPI(
@@ -43,9 +42,12 @@ prompt_template = ChatPromptTemplate.from_messages([
 Your objective is to guide users through the formalization and operational setup of their business step-by-step.
 
 Context for Step {step_number} ({step_title}):
-- Requirements: {ai_assistance}
-- Official Authority: {official_source_name} ({official_source_url})
-- Process Location: {where_to_do_it}
+- Requirements: 
+{ai_assistance}
+- Official Authority: 
+{official_source_name} ({official_source_url})
+- Process Location: 
+{where_to_do_it}
 
 Instructions:
 1. Answer the farmer/retailer's question clearly, practically, and grounded strictly in the current step context.
@@ -91,4 +93,3 @@ def chat_with_companion(request: ChatRequest):
         "step_number": request.step_number,
         "response": response.content
     }
-
