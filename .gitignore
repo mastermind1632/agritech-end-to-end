@@ -29,3 +29,5 @@ segmentation-service/.venv/
 
 # Test data - real bank statements (POPIA)
 test_data/
+
+node_modules/
