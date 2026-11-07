@@ -16,11 +16,13 @@ const proxyOpts = {
   }
 }
 
-// Optional proxy config if sending AI companion calls directly through Vite
+// Companion AI calls go through Vite. The /companion-api prefix is removed
+// before forwarding, so /companion-api/api/v1/chat reaches FastAPI as /api/v1/chat.
 const aiProxyOpts = {
   target: aiTarget,
   changeOrigin: true,
   secure: false,
+  rewrite: (path) => path.replace(/^\/companion-api/, ''),
 }
 
 export default defineConfig({
@@ -28,15 +30,15 @@ export default defineConfig({
   server: {
     port: 5173,
     host: '0.0.0.0',
-    proxy: { 
-      '/api': proxyOpts, 
+    proxy: {
+      '/api': proxyOpts,
       '/actuator': proxyOpts,
       '/companion-api': aiProxyOpts
     }
   },
   preview: {
     port: 4173,
-    proxy: { 
+    proxy: {
       '/api': proxyOpts,
       '/companion-api': aiProxyOpts
     }
