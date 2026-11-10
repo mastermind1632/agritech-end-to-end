@@ -104,6 +104,13 @@ def health_check():
     return {"status": "online", "service": "Business Companion AI"}
 
 
+@app.get("/api/v1/steps")
+def list_steps():
+    """Returns all workflow steps in order, without internal notes."""
+    steps = workflow_collection.find({}, {"_id": 0, "note": 0}).sort("stepNumber", 1)
+    return list(steps)
+
+
 @app.get("/api/v1/steps/{step_number}")
 def get_step_context(step_number: int):
     """Fetches the configuration and requirements for a specific workflow step from MongoDB."""
